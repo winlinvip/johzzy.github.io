@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+
+  
+  <title>How to support Simulcast in SRS | Johzzy Pages</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="SRS 如何支持 Simulcast1. Simulcast 介绍WebRTC 中 Simulcast 指同播, 即在一个视频媒体行(MediaLine)中存在多个视频流(RTP Stream), 这些流来自相同的视频采集源, 其差别主要体现在视频编码,分辨率,码率等方面. 目前 WebRTC 源码为 Simulcast 提供了两种接口的API(参考1)  SDP munging 风格 RID b">
+<meta property="og:type" content="article">
+<meta property="og:title" content="How to support Simulcast in SRS">
+<meta property="og:url" content="https://johzzy.github.io/2021/07/22/how-to-support-simulcast-in-srs/index.html">
+<meta property="og:site_name" content="Johzzy Pages">
+<meta property="og:description" content="SRS 如何支持 Simulcast1. Simulcast 介绍WebRTC 中 Simulcast 指同播, 即在一个视频媒体行(MediaLine)中存在多个视频流(RTP Stream), 这些流来自相同的视频采集源, 其差别主要体现在视频编码,分辨率,码率等方面. 目前 WebRTC 源码为 Simulcast 提供了两种接口的API(参考1)  SDP munging 风格 RID b">
+<meta property="og:locale">
+<meta property="article:published_time" content="2021-07-22T07:53:03.000Z">
+<meta property="article:modified_time" content="2021-07-23T05:59:37.538Z">
+<meta property="article:author" content="johzzy">
+<meta property="article:tag" content="simulcast">
+<meta name="twitter:card" content="summary">
+  
+  
+    <link rel="icon" href="/favicon.png">
+  
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  
+<link rel="stylesheet" href="/public/css/style.css">
+
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/public/" id="logo">Johzzy Pages</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/public/">Home</a>
+        
+          <a class="main-nav-link" href="/public/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="https://johzzy.github.io"></form>
+      </div>
+    </div>
+  </div>
+</header>
+      <div class="outer">
+        <section id="main"><article id="post-how-to-support-simulcast-in-srs" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/public/2021/07/22/how-to-support-simulcast-in-srs/" class="article-date">
+  <time datetime="2021-07-22T07:53:03.000Z" itemprop="datePublished">2021-07-22</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      How to support Simulcast in SRS
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h1 id="SRS-如何支持-Simulcast"><a href="#SRS-如何支持-Simulcast" class="headerlink" title="SRS 如何支持 Simulcast"></a>SRS 如何支持 Simulcast</h1><h2 id="1-Simulcast-介绍"><a href="#1-Simulcast-介绍" class="headerlink" title="1. Simulcast 介绍"></a>1. Simulcast 介绍</h2><p>WebRTC 中 Simulcast 指同播, 即在一个视频媒体行(MediaLine)中存在多个视频流(RTP Stream), 这些流来自相同的视频采集源, 其差别主要体现在视频编码,分辨率,码率等方面.</p>
+<p>目前 WebRTC 源码为 Simulcast 提供了两种接口的API(参考1)</p>
+<ul>
+<li>SDP munging 风格</li>
+<li>RID based 风格</li>
+</ul>
+<p>sdp 示例<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">// SDP munging 风格</span><br><span class="line">a=ssrc-group:SIM 1390104252 1390104253 1390104254</span><br><span class="line"></span><br><span class="line">// RID based 风格</span><br><span class="line">a=rid:high send</span><br><span class="line">a=rid:mid send</span><br><span class="line">a=rid:low send</span><br><span class="line">a=simulcast:send high;mid;low</span><br></pre></td></tr></table></figure></p>
+<p>本文重点讨论如何在 SRS 中支持 SDP munging 风格的 Simulcast, 对于 RID based 风格支持, 笔者会在下一篇介绍</p>
+<h2 id="2-SDP-munging-风格特点"><a href="#2-SDP-munging-风格特点" class="headerlink" title="2. SDP munging 风格特点"></a>2. SDP munging 风格特点</h2><h3 id="2-1-特点"><a href="#2-1-特点" class="headerlink" title="2.1 特点"></a>2.1 特点</h3><p>SDP munging 风格的 Simulcast 接口体现在sdp协商时,其视频媒体行会出现 <code>a=ssrc-group:SIM</code> 字样,其格式为</p>
+<p><code>a=ssrc-group:SIM layer0 layer1 layer2...</code></p>
+<p>其中 SSRC 序列 {layer0 layer1 layer2…} 即为 Simulcast 的多个层级, 序列长度通常不超过3.</p>
+<p>它们按照分辨率大小从小到大依次排列; 假定 layer0 的分辨率为 w0xh0, 其他类推, 则:</p>
+<p>分辨率满足: </p>
+<pre><code>layer0(w0xh0) &lt; layer1(w1xh1) &lt;  layer2(w2xh2) ...
+</code></pre><p>长宽比率满足:</p>
+<pre><code>w0 : w1 : w2 = 1: k: k^2
+h0 : h1 : h2 = 1: k: k^2
+(通常k = 2, 如果是源码开发,可自行修改)
+</code></pre><h3 id="2-2-示例-完整版见8-附录"><a href="#2-2-示例-完整版见8-附录" class="headerlink" title="2.2 示例(完整版见8. 附录)"></a>2.2 示例(完整版见<code>8. 附录</code>)</h3><p>一份offer的某个视频媒体的部分片段</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">a=ssrc-group:FID 1390104252 2798384649</span><br><span class="line">a=ssrc:1390104252 cname:rsPDymoMnGBuVXTx</span><br><span class="line">a=ssrc:1390104252 msid:ez0lPBqQZbbAN0ImN4ZrrUCbshr2khvkB6ob 99528680-68d8-418b-afc6-205372e9cb6f</span><br><span class="line">a=ssrc:2798384649 cname:rsPDymoMnGBuVXTx</span><br><span class="line">a=ssrc:2798384649 msid:ez0lPBqQZbbAN0ImN4ZrrUCbshr2khvkB6ob 99528680-68d8-418b-afc6-205372e9cb6f</span><br><span class="line">a=ssrc-group:FID 1390104253 2798384650</span><br><span class="line">a=ssrc:1390104253 cname:rsPDymoMnGBuVXTx</span><br><span class="line">a=ssrc:1390104253 msid:ez0lPBqQZbbAN0ImN4ZrrUCbshr2khvkB6ob 99528680-68d8-418b-afc6-205372e9cb6f</span><br><span class="line">a=ssrc:2798384650 cname:rsPDymoMnGBuVXTx</span><br><span class="line">a=ssrc:2798384650 msid:ez0lPBqQZbbAN0ImN4ZrrUCbshr2khvkB6ob 99528680-68d8-418b-afc6-205372e9cb6f</span><br><span class="line">a=ssrc-group:FID 1390104254 2798384651</span><br><span class="line">a=ssrc:1390104254 cname:rsPDymoMnGBuVXTx</span><br><span class="line">a=ssrc:1390104254 msid:ez0lPBqQZbbAN0ImN4ZrrUCbshr2khvkB6ob 99528680-68d8-418b-afc6-205372e9cb6f</span><br><span class="line">a=ssrc:2798384651 cname:rsPDymoMnGBuVXTx</span><br><span class="line">a=ssrc:2798384651 msid:ez0lPBqQZbbAN0ImN4ZrrUCbshr2khvkB6ob 99528680-68d8-418b-afc6-205372e9cb6f</span><br><span class="line">a=ssrc-group:SIM 1390104252 1390104253 1390104254</span><br></pre></td></tr></table></figure>
+<h3 id="2-3-解释"><a href="#2-3-解释" class="headerlink" title="2.3 解释"></a>2.3 解释</h3><p>根据这个片段可以推测, 这个sdp里面视频媒体行是一个同播3个码流的 Simulcast</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">low: 1390104252 </span><br><span class="line">mid: 1390104253 </span><br><span class="line">high: 1390104254</span><br></pre></td></tr></table></figure>
+<h2 id="3-SRS-处理-RTC-基本流程回顾与分析"><a href="#3-SRS-处理-RTC-基本流程回顾与分析" class="headerlink" title="3. SRS 处理 RTC 基本流程回顾与分析"></a>3. SRS 处理 RTC 基本流程回顾与分析</h2><h3 id="3-1-普通场景-single-stream"><a href="#3-1-普通场景-single-stream" class="headerlink" title="3.1 普通场景(single stream)"></a>3.1 普通场景(single stream)</h3><p>推流端</p>
+<p>以 SRS 的测试网页为例, 打开 <a target="_blank" rel="noopener" href="http://127.0.0.1:8080/players/rtc_publisher.html">http://127.0.0.1:8080/players/rtc_publisher.html</a> 点击 <code>开始推流</code></p>
+<p>浏览器在处理 offer 后, 会将 offer 发给 SRS, SRS 处理 offer 后返回 answer给浏览器并就绪等待收流, 浏览器在获得answer,经过后续步骤后最终推流给 SRS</p>
+<p>播放端</p>
+<p>播放端同样在 SRS 收到浏览器的offer后,回复answer,并准备把推流端的流转发给播放端</p>
+<h3 id="3-2-Simulcast-场景-simulcast-stream"><a href="#3-2-Simulcast-场景-simulcast-stream" class="headerlink" title="3.2 Simulcast 场景 (simulcast stream)"></a>3.2 Simulcast 场景 (simulcast stream)</h3><p>对于支持 Simulcast 场景, 大部份流程与上述分析基本一致, 除了以下几点</p>
+<ul>
+<li>推流端如何生成带有 <code>a=ssrc-group:SIM</code>的sdp, 以及确定 <code>SSRC 序列 &#123;layer0 layer1 layer2...&#125;</code> 的长度</li>
+<li>SRS 如何识别推流端的 <code>a=ssrc-group:SIM</code> </li>
+<li>播放端如何拉取指定layer的流</li>
+</ul>
+<h2 id="4-SRS-开发支持"><a href="#4-SRS-开发支持" class="headerlink" title="4. SRS 开发支持"></a>4. SRS 开发支持</h2><p>经过 <code>3. SRS 处理 RTC 基本流程回顾与分析</code> 后, 得出 Simulcast 场景(simulcast stream)与普通场景(single stream)的几点主要的不同之处, 这个几点不同,实际对应着几个开发需求. 解决它们就解决问题</p>
+<p>额外的, 为了应对Simulcast的细节,我们需要约定一些概念</p>
+<ul>
+<li>numberOfSimulcastLayers: 标示启用Simulcast层级个数, 也就是 <code>SSRC 序列 &#123;layer0 layer1 layer2...&#125;</code> 的长度, 用于推流端, 举例 <code>webrtc://127.0.0.1/live/livestream?numberOfSimulcastLayers=3</code></li>
+<li>layer: 指定播放的哪一层, 用于播放端, 举例 <code>webrtc://127.0.0.1/live/livestream?layer=0</code></li>
+</ul>
+<h3 id="4-1-补充-offer-对-a-ssrc-group-SIM的支持"><a href="#4-1-补充-offer-对-a-ssrc-group-SIM的支持" class="headerlink" title="4.1 补充 offer 对 a=ssrc-group:SIM的支持"></a>4.1 补充 offer 对 <code>a=ssrc-group:SIM</code>的支持</h3><p>补充 offer 对 <code>a=ssrc-group:SIM</code>的支持 主要由 <code>function UpdateNativeCreateOffer(numberOfSimulcastLayers)</code> 完成<br>UpdateNativeCreateOffer 参考 simulcast-playground 项目, 详见 参考2, 其参数 numberOfSimulcastLayers 即为 Simulcast 开的层数</p>
+<p>numberOfSimulcastLayers 取值为 1,2,3; 当 numberOfSimulcastLayers=1 时, Simulcast 场景 (simulcast stream) 向下退化为 普通场景(single stream)</p>
+<p>UpdateNativeCreateOffer 解析offer的视频媒体行的 SSRC 和 RTX SSRC, 将其作为Simulcast的其中一层, 并根据 numberOfSimulcastLayers 取值, 补充剩下的层级, 并将各层的 SSRC 聚合为</p>
+<p><code>SSRC 序列 &#123;layer0 layer1 layer2...&#125;</code> 添加形如 <code>2.1 特点</code> 描述的 <code>a=ssrc-group:SIM layer0 layer1 layer2...</code></p>
+<p>最后组合为新的offer并返回</p>
+<h3 id="4-2-补充-SRS-对-a-ssrc-group-SIM-的解析"><a href="#4-2-补充-SRS-对-a-ssrc-group-SIM-的解析" class="headerlink" title="4.2 补充 SRS 对 a=ssrc-group:SIM 的解析"></a>4.2 补充 SRS 对 <code>a=ssrc-group:SIM</code> 的解析</h3><p>SRS 解析 <code>a=ssrc-group:SIM</code> 保存至 SrsSSRCGroup<br>在获得  <code>a=ssrc-group:SIM</code> 及相应的 <code>SSRC 序列</code> 后, SRS 为 publisher 建立与 <code>SSRC 序列</code> 与之相对应的 video_track_desc, 此后 publisher启动, 处理推流端的各layer的流</p>
+<h3 id="4-3-建立-SSRC-序列-转发映射-SRS-生成并回复正确的-answer"><a href="#4-3-建立-SSRC-序列-转发映射-SRS-生成并回复正确的-answer" class="headerlink" title="4.3 建立 SSRC 序列 转发映射, SRS 生成并回复正确的 answer"></a>4.3 建立 <code>SSRC 序列</code> 转发映射, SRS 生成并回复正确的 answer</h3><p>首先,我们需要知道播放端需要播放哪个层级的视频, 即layer是多少,这个可以在播放端发给offer的消息体中, 扩展一个layer字段, 如</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">var data = &#123;</span><br><span class="line">    api: conf.apiUrl, </span><br><span class="line">    tid: conf.tid, </span><br><span class="line">    streamurl: &#x27;webrtc://127.0.0.1/live/livestream?layer=0&#x27;,</span><br><span class="line">    clientip: null, </span><br><span class="line">    sdp: offer.sdp</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>然后, SRS 解析 streamurl 取得layer后, 以其为索引, 筛选<code>SSRC 序列</code>, 然后查询 pulisher 对应的 video_track_desc, 以此创建 player 所需的 video_track_desc 和 SSRC, 返回给播放端, 并处理后续的player逻辑</p>
+<h2 id="5-操作演示"><a href="#5-操作演示" class="headerlink" title="5. 操作演示"></a>5. 操作演示</h2><h3 id="5-1-启动-SRS"><a href="#5-1-启动-SRS" class="headerlink" title="5.1 启动 SRS"></a>5.1 启动 SRS</h3><p>以 osx 为例</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">git clone https://github.com/ossrs/srs/tree/feature/simulcast</span><br><span class="line">cd srs/track </span><br><span class="line">git checkout feature/simulcast </span><br><span class="line">git pull</span><br><span class="line">./configure --osx &amp;&amp; make -j8</span><br><span class="line">ulimit -HSn 1107</span><br><span class="line">CANDIDATE=$(ifconfig en0 inet| grep inet|awk &#x27;&#123;print $2&#125;&#x27;)</span><br><span class="line">./objs/srs -c conf/rtc.conf</span><br></pre></td></tr></table></figure>
+<h3 id="5-2-操作"><a href="#5-2-操作" class="headerlink" title="5.2 操作"></a>5.2 操作</h3><p>打开推流端 <a target="_blank" rel="noopener" href="http://127.0.0.1:8080/players/rtc_publisher.html">http://127.0.0.1:8080/players/rtc_publisher.html</a></p>
+<p>输入 webrtc://127.0.0.1/live/livestream?numberOfSimulcastLayers=3</p>
+<p>打开播放端 <a target="_blank" rel="noopener" href="http://127.0.0.1:8080/players/rtc_player.html">http://127.0.0.1:8080/players/rtc_player.html</a></p>
+<p>测试 low layer, 输入 webrtc://127.0.0.1/live/livestream?layer=0</p>
+<p>测试 mid layer, 输入  webrtc://127.0.0.1/live/livestream?layer=1</p>
+<p>测试 high layer, 输入  webrtc://127.0.0.1/live/livestream?layer=2</p>
+<p>示例</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/ossrs/srs/pull/2420#issuecomment-864359462">https://github.com/ossrs/srs/pull/2420#issuecomment-864359462</a></p>
+<p><a target="_blank" rel="noopener" href="https://github.com/ossrs/srs/pull/2420#issuecomment-865427561">https://github.com/ossrs/srs/pull/2420#issuecomment-865427561</a></p>
+<h2 id="6-补充"><a href="#6-补充" class="headerlink" title="6. 补充"></a>6. 补充</h2><p>前面 <code>1. Simulcast 介绍</code> 提到, Simulcast 主要存在两种API接口, 本文介绍的 SDP munging 为其一, 另一种 RID based 开发已基本完成, 代码提交和介绍文档随后给出</p>
+<p>体验详见 <a target="_blank" rel="noopener" href="https://github.com/johzzy/srs/tree/johnny/experimental">https://github.com/johzzy/srs/tree/johnny/experimental</a></p>
+<h2 id="7-参考"><a href="#7-参考" class="headerlink" title="7. 参考"></a>7. 参考</h2><ol>
+<li><a target="_blank" rel="noopener" href="https://www.meetecho.com/blog/simulcast-janus-ssrc/">https://www.meetecho.com/blog/simulcast-janus-ssrc/</a><br><a target="_blank" rel="noopener" href="https://webrtchacks.com/not-a-guide-to-sdp-munging/">https://webrtchacks.com/not-a-guide-to-sdp-munging/</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/fippo/simulcast-playground">https://github.com/fippo/simulcast-playground</a><br><a target="_blank" rel="noopener" href="https://fippo.github.io/simulcast-playground/">https://fippo.github.io/simulcast-playground/</a><br><a target="_blank" rel="noopener" href="https://webrtchacks.com/a-playground-for-simulcast-without-an-sfu/">https://webrtchacks.com/a-playground-for-simulcast-without-an-sfu/</a></li>
+</ol>
+<h2 id="8-附录"><a href="#8-附录" class="headerlink" title="8. 附录"></a>8. 附录</h2><p>一份 SDP munging 风格 Simulcast 的 sdp</p>
+<p><a target="_blank" rel="noopener" href="https://gist.github.com/johzzy/067dd46a1222bf211f79aef5bcf4cd3a">https://gist.github.com/johzzy/067dd46a1222bf211f79aef5bcf4cd3a</a></p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://johzzy.github.io/2021/07/22/how-to-support-simulcast-in-srs/" data-id="ckreqxd6o0000ufvq0gaa34wx" class="article-share-link">Share</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/public/tags/simulcast/" rel="tag">simulcast</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/public/2021/07/23/how-to-add-custom-field-in-webrtc-sdp/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Newer</strong>
+      <div class="article-nav-title">
+        
+          How to add custom field in WebRTC SDP
+        
+      </div>
+    </a>
+  
+  
+    <a href="/public/2021/06/28/a-mac-bug-about-udp-port-triggered-by-srs/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">a mac bug about udp port triggered by srs</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Categories</h3>
+    <div class="widget">
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/public/categories/%E6%9C%AA%E5%88%86%E7%B1%BB/">未分类</a><span class="category-list-count">16</span></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tags</h3>
+    <div class="widget">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/public/tags/C/" rel="tag">C++</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/public/tags/FTP/" rel="tag">FTP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/public/tags/Python/" rel="tag">Python</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/public/tags/ffmpeg/" rel="tag">ffmpeg</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/public/tags/lambda/" rel="tag">lambda</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/public/tags/shell/" rel="tag">shell</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/public/tags/simulcast/" rel="tag">simulcast</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/public/tags/webrtc/" rel="tag">webrtc</a><span class="tag-list-count">3</span></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2021/07/">July 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2021/06/">June 2021</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2018/05/">May 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2016/08/">August 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2016/07/">July 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2016/06/">June 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2016/04/">April 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2016/01/">January 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2015/11/">November 2015</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2015/01/">January 2015</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2014/11/">November 2014</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2014/02/">February 2014</a><span class="archive-list-count">1</span></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/public/2021/07/23/how-to-add-custom-field-in-webrtc-sdp/">How to add custom field in WebRTC SDP</a>
+          </li>
+        
+          <li>
+            <a href="/public/2021/07/22/how-to-support-simulcast-in-srs/">How to support Simulcast in SRS</a>
+          </li>
+        
+          <li>
+            <a href="/public/2021/06/28/a-mac-bug-about-udp-port-triggered-by-srs/">a mac bug about udp port triggered by srs</a>
+          </li>
+        
+          <li>
+            <a href="/public/2021/06/23/simulcast-layer-state-control/">simulcast layer state control</a>
+          </li>
+        
+          <li>
+            <a href="/public/2021/06/18/simulcast-support-in-srs/">simulcast support in srs</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2021 johzzy<br>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/public/" class="mobile-nav-link">Home</a>
+  
+    <a href="/public/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+  
+<link rel="stylesheet" href="/public/fancybox/jquery.fancybox.css">
+
+  
+<script src="/public/fancybox/jquery.fancybox.pack.js"></script>
+
+
+
+
+<script src="/public/js/script.js"></script>
+
+
+
+
+  </div>
+</body>
+</html>

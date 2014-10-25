@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+
+  
+  <title>Johzzy Pages</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="some code, some note.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Johzzy Pages">
+<meta property="og:url" content="https://johzzy.github.io/index.html">
+<meta property="og:site_name" content="Johzzy Pages">
+<meta property="og:description" content="some code, some note.">
+<meta property="og:locale">
+<meta property="article:author" content="johzzy">
+<meta name="twitter:card" content="summary">
+  
+  
+    <link rel="icon" href="/favicon.png">
+  
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  
+<link rel="stylesheet" href="/public/css/style.css">
+
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/public/" id="logo">Johzzy Pages</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/public/">Home</a>
+        
+          <a class="main-nav-link" href="/public/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="https://johzzy.github.io"></form>
+      </div>
+    </div>
+  </div>
+</header>
+      <div class="outer">
+        <section id="main">
+  
+    <article id="post-how-to-add-custom-field-in-webrtc-sdp" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/public/2021/07/23/how-to-add-custom-field-in-webrtc-sdp/" class="article-date">
+  <time datetime="2021-07-23T05:34:08.000Z" itemprop="datePublished">2021-07-23</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/public/2021/07/23/how-to-add-custom-field-in-webrtc-sdp/">How to add custom field in WebRTC SDP</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h1 id="WebRTC-SDP-如何添加自定义字段"><a href="#WebRTC-SDP-如何添加自定义字段" class="headerlink" title="WebRTC SDP 如何添加自定义字段"></a>WebRTC SDP 如何添加自定义字段</h1><p>因业务需要, 对于不同场景下的 PeerConnection 需要施以不同的配置, 由此想到解决办法是:</p>
+<pre><code>在 WebRTC SDP 添加自定义字段, 并在源码里增加对应字段的解析器和配置集, 分派至需要配置的地方.
+</code></pre><h2 id="1-SDP-修改"><a href="#1-SDP-修改" class="headerlink" title="1. SDP 修改"></a>1. SDP 修改</h2><p>举例 </p>
+<p>向一份Offer中全局范围添加 <code>a=johzzy-config hello=1,world=2</code>, 完整版本详见 附录</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">v=0</span><br><span class="line">o=- 8320953459633665386 2 IN IP4 127.0.0.1</span><br><span class="line">s=-</span><br><span class="line">t=0 0</span><br><span class="line">a=group:BUNDLE 0 1</span><br><span class="line">a=extmap-allow-mixed</span><br><span class="line">a=msid-semantic: WMS fr2ZdH5Z5douqinTOprWuS2lAhjkqyNZJqE4</span><br><span class="line">a=johzzy-config hello=1,world=2</span><br><span class="line">m=audio 9 UDP/TLS/RTP/SAVPF 111 103 104 9 0 8 106 105 13 110 112 113 126</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<p>然后设置到 <code>PeerConnection.setLocalDescription</code></p>
+<h2 id="2-PeerConnection-解析-SDP-的过程分析"><a href="#2-PeerConnection-解析-SDP-的过程分析" class="headerlink" title="2. PeerConnection 解析 SDP 的过程分析"></a>2. PeerConnection 解析 SDP 的过程分析</h2><p>根据WebRTC源码, 以Android为例, 得到相关调用栈如下:<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">PeerConnection.setLocalDescription</span><br><span class="line">...generated_peerconnection_jni...</span><br><span class="line">JNI_PeerConnection_SetLocalDescription</span><br><span class="line">JavaToNativeSessionDescription</span><br><span class="line">CreateSessionDescription</span><br><span class="line">SdpDeserialize</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">////////////////////////////////</span><br><span class="line">PeerConnection::SetLocalDescription</span><br><span class="line">SdpOfferAnswerHandler::SetLocalDescription</span><br><span class="line">SdpOfferAnswerHandler::DoSetLocalDescription</span><br><span class="line">SdpOfferAnswerHandler::ApplyLocalDescription</span><br><span class="line">...</span><br></pre></td></tr></table></figure></p>
+<p>重点看一下 SdpDeserialize<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line">// @see pc/webrtc_sdp.cc</span><br><span class="line"></span><br><span class="line">bool SdpDeserialize(const std::string&amp; message,</span><br><span class="line">                    JsepSessionDescription* jdesc,</span><br><span class="line">                    SdpParseError* error) &#123;</span><br><span class="line">  std::string session_id;</span><br><span class="line">  std::string session_version;</span><br><span class="line">  TransportDescription session_td(&quot;&quot;, &quot;&quot;);</span><br><span class="line">  RtpHeaderExtensions session_extmaps;</span><br><span class="line">  rtc::SocketAddress session_connection_addr;</span><br><span class="line">  auto desc = std::make_unique&lt;cricket::SessionDescription&gt;();</span><br><span class="line">  size_t current_pos = 0;</span><br><span class="line"></span><br><span class="line">  // Session Description</span><br><span class="line">  if (!ParseSessionDescription(message, &amp;current_pos, &amp;session_id,</span><br><span class="line">                               &amp;session_version, &amp;session_td, &amp;session_extmaps,</span><br><span class="line">                               &amp;session_connection_addr, desc.get(), error)) &#123;</span><br><span class="line">    return false;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  // Media Description</span><br><span class="line">  std::vector&lt;std::unique_ptr&lt;JsepIceCandidate&gt;&gt; candidates;</span><br><span class="line">  if (!ParseMediaDescription(message, session_td, session_extmaps, &amp;current_pos,</span><br><span class="line">                             session_connection_addr, desc.get(), &amp;candidates,</span><br><span class="line">                             error)) &#123;</span><br><span class="line">    return false;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  jdesc-&gt;Initialize(std::move(desc), session_id, session_version);</span><br><span class="line"></span><br><span class="line">  for (const auto&amp; candidate : candidates) &#123;</span><br><span class="line">    jdesc-&gt;AddCandidate(candidate.get());</span><br><span class="line">  &#125;</span><br><span class="line">  return true;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure></p>
+<p>可以看到两个函数 ParseSessionDescription/ParseMediaDescription</p>
+<p>前文添加<code>a=johzzy-config hello=1,world=2</code>的位置是Session行, 由此可以继续分析  ParseSessionDescription 代码</p>
+<p>ParseSessionDescription 函数代码片段<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br></pre></td><td class="code"><pre><span class="line">// RFC 4566</span><br><span class="line">// a=* (zero or more session attribute lines)</span><br><span class="line">while (GetLineWithType(message, pos, &amp;line, kLineTypeAttributes)) &#123;</span><br><span class="line">  if (HasAttribute(line, kAttributeGroup)) &#123;</span><br><span class="line">    if (!ParseGroupAttribute(line, desc, error)) &#123;</span><br><span class="line">      return false;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125; else if (HasAttribute(line, kAttributeIceUfrag)) &#123;</span><br><span class="line">    if (!GetValue(line, kAttributeIceUfrag, &amp;(session_td-&gt;ice_ufrag),</span><br><span class="line">                  error)) &#123;</span><br><span class="line">      return false;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125; else if (HasAttribute(line, kAttributeIcePwd)) &#123;</span><br><span class="line">    if (!GetValue(line, kAttributeIcePwd, &amp;(session_td-&gt;ice_pwd), error)) &#123;</span><br><span class="line">      return false;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125; else if (HasAttribute(line, kAttributeIceLite)) &#123;</span><br><span class="line">    session_td-&gt;ice_mode = cricket::ICEMODE_LITE;</span><br><span class="line">  &#125; else if (HasAttribute(line, kAttributeIceOption)) &#123;</span><br><span class="line">    if (!ParseIceOptions(line, &amp;(session_td-&gt;transport_options), error)) &#123;</span><br><span class="line">      return false;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125; else if (HasAttribute(line, kAttributeFingerprint)) &#123;</span><br><span class="line">    if (session_td-&gt;identity_fingerprint.get()) &#123;</span><br><span class="line">      return ParseFailed(</span><br><span class="line">          line,</span><br><span class="line">          &quot;Can&#x27;t have multiple fingerprint attributes at the same level.&quot;,</span><br><span class="line">          error);</span><br><span class="line">    &#125;</span><br><span class="line">    std::unique_ptr&lt;rtc::SSLFingerprint&gt; fingerprint;</span><br><span class="line">    if (!ParseFingerprintAttribute(line, &amp;fingerprint, error)) &#123;</span><br><span class="line">      return false;</span><br><span class="line">    &#125;</span><br><span class="line">    session_td-&gt;identity_fingerprint = std::move(fingerprint);</span><br><span class="line">  &#125; else if (HasAttribute(line, kAttributeSetup)) &#123;</span><br><span class="line">    if (!ParseDtlsSetup(line, &amp;(session_td-&gt;connection_role), error)) &#123;</span><br><span class="line">      return false;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125; else if (HasAttribute(line, kAttributeMsidSemantics)) &#123;</span><br><span class="line">    std::string semantics;</span><br><span class="line">    if (!GetValue(line, kAttributeMsidSemantics, &amp;semantics, error)) &#123;</span><br><span class="line">      return false;</span><br><span class="line">    &#125;</span><br><span class="line">    desc-&gt;set_msid_supported(</span><br><span class="line">        CaseInsensitiveFind(semantics, kMediaStreamSemantic));</span><br><span class="line">  &#125; else if (HasAttribute(line, kAttributeExtmapAllowMixed)) &#123;</span><br><span class="line">    desc-&gt;set_extmap_allow_mixed(true);</span><br><span class="line">  &#125; else if (HasAttribute(line, kAttributeExtmap)) &#123;</span><br><span class="line">    RtpExtension extmap;</span><br><span class="line">    if (!ParseExtmap(line, &amp;extmap, error)) &#123;</span><br><span class="line">      return false;</span><br><span class="line">    &#125;</span><br><span class="line">    session_extmaps-&gt;push_back(extmap);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure></p>
+<p>从这份代码片段可以看到 WebRTC在解析Session级别的<code>a=*</code> 字段时, </p>
+<p>先使用 GetLineWithType(message, pos, &amp;line, kLineTypeAttributes) 取一行</p>
+<p>然后使用 HasAttribute 判断类型</p>
+<p>最后根据具体类型,施以相应的解析流程</p>
+<p>对应我们新增的 <code>a=johzzy-config hello=1,world=2</code></p>
+<p>就需要新增一下内容</p>
+<ul>
+<li>类型 <code>a=johzzy-config</code></li>
+<li>对 <code>a=johzzy-config</code> 的解析流程</li>
+</ul>
+<h2 id="3-PeerConnection-对-SDP-的解析支持"><a href="#3-PeerConnection-对-SDP-的解析支持" class="headerlink" title="3. PeerConnection 对 SDP 的解析支持"></a>3. PeerConnection 对 SDP 的解析支持</h2><p>根据上述分析, 可新增如下代码</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">while (GetLineWithType(message, pos, &amp;line, kLineTypeAttributes)) &#123;</span><br><span class="line">  if ...</span><br><span class="line">  &#125; else if (HasAttribute(line, kAttributeExtmap)) &#123;</span><br><span class="line">    RtpExtension extmap;</span><br><span class="line">    if (!ParseExtmap(line, &amp;extmap, error)) &#123;</span><br><span class="line">      return false;</span><br><span class="line">    &#125;</span><br><span class="line">    session_extmaps-&gt;push_back(extmap);</span><br><span class="line">  &#125; else if (HasAttribute(line, kAttributeCustomConfig)) &#123; // 此为新增</span><br><span class="line">    session_td-&gt;custom_config.Parse(line);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>其中相关代码定义如下:<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">static const char kAttributeCustomConfig[] = &quot;johzzy-config&quot;;</span><br><span class="line">struct AttributeCustomConfig &#123;</span><br><span class="line">    int Parse(const std::string&amp; line);</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">struct TransportDescription &#123;</span><br><span class="line">    ...</span><br><span class="line">    AttributeCustomConfig custom_config; // 此为新增</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure></p>
+<h2 id="4-AttributeCustomConfig-分派"><a href="#4-AttributeCustomConfig-分派" class="headerlink" title="4. AttributeCustomConfig 分派"></a>4. AttributeCustomConfig 分派</h2><p>要想解决 AttributeCustomConfig 分派的问题, 需要搞清楚 PeerConnection 的结构</p>
+<p>…</p>
+<p>待续</p>
+<h2 id="附录"><a href="#附录" class="headerlink" title="附录"></a>附录</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br><span class="line">153</span><br><span class="line">154</span><br><span class="line">155</span><br><span class="line">156</span><br><span class="line">157</span><br><span class="line">158</span><br><span class="line">159</span><br><span class="line">160</span><br><span class="line">161</span><br><span class="line">162</span><br><span class="line">163</span><br><span class="line">164</span><br><span class="line">165</span><br><span class="line">166</span><br><span class="line">167</span><br><span class="line">168</span><br><span class="line">169</span><br><span class="line">170</span><br><span class="line">171</span><br><span class="line">172</span><br><span class="line">173</span><br><span class="line">174</span><br><span class="line">175</span><br><span class="line">176</span><br><span class="line">177</span><br></pre></td><td class="code"><pre><span class="line">v=0</span><br><span class="line">o=- 8320953459633665386 2 IN IP4 127.0.0.1</span><br><span class="line">s=-</span><br><span class="line">t=0 0</span><br><span class="line">a=group:BUNDLE 0 1</span><br><span class="line">a=extmap-allow-mixed</span><br><span class="line">a=msid-semantic: WMS fr2ZdH5Z5douqinTOprWuS2lAhjkqyNZJqE4</span><br><span class="line">a=johzzy-config hello=1,world=2</span><br><span class="line">m=audio 9 UDP/TLS/RTP/SAVPF 111 103 104 9 0 8 106 105 13 110 112 113 126</span><br><span class="line">c=IN IP4 0.0.0.0</span><br><span class="line">a=rtcp:9 IN IP4 0.0.0.0</span><br><span class="line">a=ice-ufrag:W5kQ</span><br><span class="line">a=ice-pwd:WYhsnmnjesYbmRu3nfAniUCb</span><br><span class="line">a=ice-options:trickle</span><br><span class="line">a=fingerprint:sha-256 29:77:A9:4F:1C:75:1F:FF:80:BF:41:B0:8A:93:87:43:58:5D:DE:2F:D1:2A:3C:56:0A:FE:F0:26:1A:6C:8E:DE</span><br><span class="line">a=setup:actpass</span><br><span class="line">a=mid:0</span><br><span class="line">a=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-level</span><br><span class="line">a=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time</span><br><span class="line">a=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01</span><br><span class="line">a=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid</span><br><span class="line">a=extmap:5 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id</span><br><span class="line">a=extmap:6 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id</span><br><span class="line">a=sendrecv</span><br><span class="line">a=msid:fr2ZdH5Z5douqinTOprWuS2lAhjkqyNZJqE4 d75d31dd-2882-4d4a-8c2f-86520c2351e2</span><br><span class="line">a=rtcp-mux</span><br><span class="line">a=rtpmap:111 opus/48000/2</span><br><span class="line">a=rtcp-fb:111 transport-cc</span><br><span class="line">a=fmtp:111 minptime=10;useinbandfec=1</span><br><span class="line">a=rtpmap:103 ISAC/16000</span><br><span class="line">a=rtpmap:104 ISAC/32000</span><br><span class="line">a=rtpmap:9 G722/8000</span><br><span class="line">a=rtpmap:0 PCMU/8000</span><br><span class="line">a=rtpmap:8 PCMA/8000</span><br><span class="line">a=rtpmap:106 CN/32000</span><br><span class="line">a=rtpmap:105 CN/16000</span><br><span class="line">a=rtpmap:13 CN/8000</span><br><span class="line">a=rtpmap:110 telephone-event/48000</span><br><span class="line">a=rtpmap:112 telephone-event/32000</span><br><span class="line">a=rtpmap:113 telephone-event/16000</span><br><span class="line">a=rtpmap:126 telephone-event/8000</span><br><span class="line">a=ssrc:1576372018 cname:k4SO79jR7YMb0Z0n</span><br><span class="line">a=ssrc:1576372018 msid:fr2ZdH5Z5douqinTOprWuS2lAhjkqyNZJqE4 d75d31dd-2882-4d4a-8c2f-86520c2351e2</span><br><span class="line">a=ssrc:1576372018 mslabel:fr2ZdH5Z5douqinTOprWuS2lAhjkqyNZJqE4</span><br><span class="line">a=ssrc:1576372018 label:d75d31dd-2882-4d4a-8c2f-86520c2351e2</span><br><span class="line">m=video 9 UDP/TLS/RTP/SAVPF 96 97 98 99 100 101 102 121 127 120 125 107 108 109 35 36 124 119 123 118 114 115 116</span><br><span class="line">c=IN IP4 0.0.0.0</span><br><span class="line">a=rtcp:9 IN IP4 0.0.0.0</span><br><span class="line">a=ice-ufrag:W5kQ</span><br><span class="line">a=ice-pwd:WYhsnmnjesYbmRu3nfAniUCb</span><br><span class="line">a=ice-options:trickle</span><br><span class="line">a=fingerprint:sha-256 29:77:A9:4F:1C:75:1F:FF:80:BF:41:B0:8A:93:87:43:58:5D:DE:2F:D1:2A:3C:56:0A:FE:F0:26:1A:6C:8E:DE</span><br><span class="line">a=setup:actpass</span><br><span class="line">a=mid:1</span><br><span class="line">a=extmap:14 urn:ietf:params:rtp-hdrext:toffset</span><br><span class="line">a=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time</span><br><span class="line">a=extmap:13 urn:3gpp:video-orientation</span><br><span class="line">a=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01</span><br><span class="line">a=extmap:12 http://www.webrtc.org/experiments/rtp-hdrext/playout-delay</span><br><span class="line">a=extmap:11 http://www.webrtc.org/experiments/rtp-hdrext/video-content-type</span><br><span class="line">a=extmap:7 http://www.webrtc.org/experiments/rtp-hdrext/video-timing</span><br><span class="line">a=extmap:8 http://www.webrtc.org/experiments/rtp-hdrext/color-space</span><br><span class="line">a=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid</span><br><span class="line">a=extmap:5 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id</span><br><span class="line">a=extmap:6 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id</span><br><span class="line">a=sendrecv</span><br><span class="line">a=msid:fr2ZdH5Z5douqinTOprWuS2lAhjkqyNZJqE4 344f6e6d-1bec-478f-bdf1-1265e757dbb8</span><br><span class="line">a=rtcp-mux</span><br><span class="line">a=rtcp-rsize</span><br><span class="line">a=rtpmap:96 VP8/90000</span><br><span class="line">a=rtcp-fb:96 goog-remb</span><br><span class="line">a=rtcp-fb:96 transport-cc</span><br><span class="line">a=rtcp-fb:96 ccm fir</span><br><span class="line">a=rtcp-fb:96 nack</span><br><span class="line">a=rtcp-fb:96 nack pli</span><br><span class="line">a=rtpmap:97 rtx/90000</span><br><span class="line">a=fmtp:97 apt=96</span><br><span class="line">a=rtpmap:98 VP9/90000</span><br><span class="line">a=rtcp-fb:98 goog-remb</span><br><span class="line">a=rtcp-fb:98 transport-cc</span><br><span class="line">a=rtcp-fb:98 ccm fir</span><br><span class="line">a=rtcp-fb:98 nack</span><br><span class="line">a=rtcp-fb:98 nack pli</span><br><span class="line">a=fmtp:98 profile-id=0</span><br><span class="line">a=rtpmap:99 rtx/90000</span><br><span class="line">a=fmtp:99 apt=98</span><br><span class="line">a=rtpmap:100 VP9/90000</span><br><span class="line">a=rtcp-fb:100 goog-remb</span><br><span class="line">a=rtcp-fb:100 transport-cc</span><br><span class="line">a=rtcp-fb:100 ccm fir</span><br><span class="line">a=rtcp-fb:100 nack</span><br><span class="line">a=rtcp-fb:100 nack pli</span><br><span class="line">a=fmtp:100 profile-id=2</span><br><span class="line">a=rtpmap:101 rtx/90000</span><br><span class="line">a=fmtp:101 apt=100</span><br><span class="line">a=rtpmap:102 H264/90000</span><br><span class="line">a=rtcp-fb:102 goog-remb</span><br><span class="line">a=rtcp-fb:102 transport-cc</span><br><span class="line">a=rtcp-fb:102 ccm fir</span><br><span class="line">a=rtcp-fb:102 nack</span><br><span class="line">a=rtcp-fb:102 nack pli</span><br><span class="line">a=fmtp:102 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f</span><br><span class="line">a=rtpmap:121 rtx/90000</span><br><span class="line">a=fmtp:121 apt=102</span><br><span class="line">a=rtpmap:127 H264/90000</span><br><span class="line">a=rtcp-fb:127 goog-remb</span><br><span class="line">a=rtcp-fb:127 transport-cc</span><br><span class="line">a=rtcp-fb:127 ccm fir</span><br><span class="line">a=rtcp-fb:127 nack</span><br><span class="line">a=rtcp-fb:127 nack pli</span><br><span class="line">a=fmtp:127 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42001f</span><br><span class="line">a=rtpmap:120 rtx/90000</span><br><span class="line">a=fmtp:120 apt=127</span><br><span class="line">a=rtpmap:125 H264/90000</span><br><span class="line">a=rtcp-fb:125 goog-remb</span><br><span class="line">a=rtcp-fb:125 transport-cc</span><br><span class="line">a=rtcp-fb:125 ccm fir</span><br><span class="line">a=rtcp-fb:125 nack</span><br><span class="line">a=rtcp-fb:125 nack pli</span><br><span class="line">a=fmtp:125 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f</span><br><span class="line">a=rtpmap:107 rtx/90000</span><br><span class="line">a=fmtp:107 apt=125</span><br><span class="line">a=rtpmap:108 H264/90000</span><br><span class="line">a=rtcp-fb:108 goog-remb</span><br><span class="line">a=rtcp-fb:108 transport-cc</span><br><span class="line">a=rtcp-fb:108 ccm fir</span><br><span class="line">a=rtcp-fb:108 nack</span><br><span class="line">a=rtcp-fb:108 nack pli</span><br><span class="line">a=fmtp:108 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f</span><br><span class="line">a=rtpmap:109 rtx/90000</span><br><span class="line">a=fmtp:109 apt=108</span><br><span class="line">a=rtpmap:35 AV1X/90000</span><br><span class="line">a=rtcp-fb:35 goog-remb</span><br><span class="line">a=rtcp-fb:35 transport-cc</span><br><span class="line">a=rtcp-fb:35 ccm fir</span><br><span class="line">a=rtcp-fb:35 nack</span><br><span class="line">a=rtcp-fb:35 nack pli</span><br><span class="line">a=rtpmap:36 rtx/90000</span><br><span class="line">a=fmtp:36 apt=35</span><br><span class="line">a=rtpmap:124 H264/90000</span><br><span class="line">a=rtcp-fb:124 goog-remb</span><br><span class="line">a=rtcp-fb:124 transport-cc</span><br><span class="line">a=rtcp-fb:124 ccm fir</span><br><span class="line">a=rtcp-fb:124 nack</span><br><span class="line">a=rtcp-fb:124 nack pli</span><br><span class="line">a=fmtp:124 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=4d0032</span><br><span class="line">a=rtpmap:119 rtx/90000</span><br><span class="line">a=fmtp:119 apt=124</span><br><span class="line">a=rtpmap:123 H264/90000</span><br><span class="line">a=rtcp-fb:123 goog-remb</span><br><span class="line">a=rtcp-fb:123 transport-cc</span><br><span class="line">a=rtcp-fb:123 ccm fir</span><br><span class="line">a=rtcp-fb:123 nack</span><br><span class="line">a=rtcp-fb:123 nack pli</span><br><span class="line">a=fmtp:123 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640032</span><br><span class="line">a=rtpmap:118 rtx/90000</span><br><span class="line">a=fmtp:118 apt=123</span><br><span class="line">a=rtpmap:114 red/90000</span><br><span class="line">a=rtpmap:115 rtx/90000</span><br><span class="line">a=fmtp:115 apt=114</span><br><span class="line">a=rtpmap:116 ulpfec/90000</span><br><span class="line">a=ssrc-group:FID 2456225426 2163325368</span><br><span class="line">a=ssrc:2456225426 cname:k4SO79jR7YMb0Z0n</span><br><span class="line">a=ssrc:2456225426 msid:fr2ZdH5Z5douqinTOprWuS2lAhjkqyNZJqE4 344f6e6d-1bec-478f-bdf1-1265e757dbb8</span><br><span class="line">a=ssrc:2163325368 cname:k4SO79jR7YMb0Z0n</span><br><span class="line">a=ssrc:2163325368 msid:fr2ZdH5Z5douqinTOprWuS2lAhjkqyNZJqE4 344f6e6d-1bec-478f-bdf1-1265e757dbb8</span><br><span class="line">a=ssrc-group:FID 2456225427 2163325369</span><br><span class="line">a=ssrc:2456225427 cname:k4SO79jR7YMb0Z0n</span><br><span class="line">a=ssrc:2456225427 msid:fr2ZdH5Z5douqinTOprWuS2lAhjkqyNZJqE4 344f6e6d-1bec-478f-bdf1-1265e757dbb8</span><br><span class="line">a=ssrc:2163325369 cname:k4SO79jR7YMb0Z0n</span><br><span class="line">a=ssrc:2163325369 msid:fr2ZdH5Z5douqinTOprWuS2lAhjkqyNZJqE4 344f6e6d-1bec-478f-bdf1-1265e757dbb8</span><br><span class="line">a=ssrc-group:FID 2456225428 2163325370</span><br><span class="line">a=ssrc:2456225428 cname:k4SO79jR7YMb0Z0n</span><br><span class="line">a=ssrc:2456225428 msid:fr2ZdH5Z5douqinTOprWuS2lAhjkqyNZJqE4 344f6e6d-1bec-478f-bdf1-1265e757dbb8</span><br><span class="line">a=ssrc:2163325370 cname:k4SO79jR7YMb0Z0n</span><br><span class="line">a=ssrc:2163325370 msid:fr2ZdH5Z5douqinTOprWuS2lAhjkqyNZJqE4 344f6e6d-1bec-478f-bdf1-1265e757dbb8</span><br><span class="line">a=ssrc-group:SIM 2456225426 2456225427 2456225428</span><br></pre></td></tr></table></figure>
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://johzzy.github.io/2021/07/23/how-to-add-custom-field-in-webrtc-sdp/" data-id="ckrfx4k4600003kvq87xcaf71" class="article-share-link">Share</a>
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-how-to-support-simulcast-in-srs" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/public/2021/07/22/how-to-support-simulcast-in-srs/" class="article-date">
+  <time datetime="2021-07-22T07:53:03.000Z" itemprop="datePublished">2021-07-22</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/public/2021/07/22/how-to-support-simulcast-in-srs/">How to support Simulcast in SRS</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h1 id="SRS-如何支持-Simulcast"><a href="#SRS-如何支持-Simulcast" class="headerlink" title="SRS 如何支持 Simulcast"></a>SRS 如何支持 Simulcast</h1><h2 id="1-Simulcast-介绍"><a href="#1-Simulcast-介绍" class="headerlink" title="1. Simulcast 介绍"></a>1. Simulcast 介绍</h2><p>WebRTC 中 Simulcast 指同播, 即在一个视频媒体行(MediaLine)中存在多个视频流(RTP Stream), 这些流来自相同的视频采集源, 其差别主要体现在视频编码,分辨率,码率等方面.</p>
+<p>目前 WebRTC 源码为 Simulcast 提供了两种接口的API(参考1)</p>
+<ul>
+<li>SDP munging 风格</li>
+<li>RID based 风格</li>
+</ul>
+<p>sdp 示例<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">// SDP munging 风格</span><br><span class="line">a=ssrc-group:SIM 1390104252 1390104253 1390104254</span><br><span class="line"></span><br><span class="line">// RID based 风格</span><br><span class="line">a=rid:high send</span><br><span class="line">a=rid:mid send</span><br><span class="line">a=rid:low send</span><br><span class="line">a=simulcast:send high;mid;low</span><br></pre></td></tr></table></figure></p>
+<p>本文重点讨论如何在 SRS 中支持 SDP munging 风格的 Simulcast, 对于 RID based 风格支持, 笔者会在下一篇介绍</p>
+<h2 id="2-SDP-munging-风格特点"><a href="#2-SDP-munging-风格特点" class="headerlink" title="2. SDP munging 风格特点"></a>2. SDP munging 风格特点</h2><h3 id="2-1-特点"><a href="#2-1-特点" class="headerlink" title="2.1 特点"></a>2.1 特点</h3><p>SDP munging 风格的 Simulcast 接口体现在sdp协商时,其视频媒体行会出现 <code>a=ssrc-group:SIM</code> 字样,其格式为</p>
+<p><code>a=ssrc-group:SIM layer0 layer1 layer2...</code></p>
+<p>其中 SSRC 序列 {layer0 layer1 layer2…} 即为 Simulcast 的多个层级, 序列长度通常不超过3.</p>
+<p>它们按照分辨率大小从小到大依次排列; 假定 layer0 的分辨率为 w0xh0, 其他类推, 则:</p>
+<p>分辨率满足: </p>
+<pre><code>layer0(w0xh0) &lt; layer1(w1xh1) &lt;  layer2(w2xh2) ...
+</code></pre><p>长宽比率满足:</p>
+<pre><code>w0 : w1 : w2 = 1: k: k^2
+h0 : h1 : h2 = 1: k: k^2
+(通常k = 2, 如果是源码开发,可自行修改)
+</code></pre><h3 id="2-2-示例-完整版见8-附录"><a href="#2-2-示例-完整版见8-附录" class="headerlink" title="2.2 示例(完整版见8. 附录)"></a>2.2 示例(完整版见<code>8. 附录</code>)</h3><p>一份offer的某个视频媒体的部分片段</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">a=ssrc-group:FID 1390104252 2798384649</span><br><span class="line">a=ssrc:1390104252 cname:rsPDymoMnGBuVXTx</span><br><span class="line">a=ssrc:1390104252 msid:ez0lPBqQZbbAN0ImN4ZrrUCbshr2khvkB6ob 99528680-68d8-418b-afc6-205372e9cb6f</span><br><span class="line">a=ssrc:2798384649 cname:rsPDymoMnGBuVXTx</span><br><span class="line">a=ssrc:2798384649 msid:ez0lPBqQZbbAN0ImN4ZrrUCbshr2khvkB6ob 99528680-68d8-418b-afc6-205372e9cb6f</span><br><span class="line">a=ssrc-group:FID 1390104253 2798384650</span><br><span class="line">a=ssrc:1390104253 cname:rsPDymoMnGBuVXTx</span><br><span class="line">a=ssrc:1390104253 msid:ez0lPBqQZbbAN0ImN4ZrrUCbshr2khvkB6ob 99528680-68d8-418b-afc6-205372e9cb6f</span><br><span class="line">a=ssrc:2798384650 cname:rsPDymoMnGBuVXTx</span><br><span class="line">a=ssrc:2798384650 msid:ez0lPBqQZbbAN0ImN4ZrrUCbshr2khvkB6ob 99528680-68d8-418b-afc6-205372e9cb6f</span><br><span class="line">a=ssrc-group:FID 1390104254 2798384651</span><br><span class="line">a=ssrc:1390104254 cname:rsPDymoMnGBuVXTx</span><br><span class="line">a=ssrc:1390104254 msid:ez0lPBqQZbbAN0ImN4ZrrUCbshr2khvkB6ob 99528680-68d8-418b-afc6-205372e9cb6f</span><br><span class="line">a=ssrc:2798384651 cname:rsPDymoMnGBuVXTx</span><br><span class="line">a=ssrc:2798384651 msid:ez0lPBqQZbbAN0ImN4ZrrUCbshr2khvkB6ob 99528680-68d8-418b-afc6-205372e9cb6f</span><br><span class="line">a=ssrc-group:SIM 1390104252 1390104253 1390104254</span><br></pre></td></tr></table></figure>
+<h3 id="2-3-解释"><a href="#2-3-解释" class="headerlink" title="2.3 解释"></a>2.3 解释</h3><p>根据这个片段可以推测, 这个sdp里面视频媒体行是一个同播3个码流的 Simulcast</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">low: 1390104252 </span><br><span class="line">mid: 1390104253 </span><br><span class="line">high: 1390104254</span><br></pre></td></tr></table></figure>
+<h2 id="3-SRS-处理-RTC-基本流程回顾与分析"><a href="#3-SRS-处理-RTC-基本流程回顾与分析" class="headerlink" title="3. SRS 处理 RTC 基本流程回顾与分析"></a>3. SRS 处理 RTC 基本流程回顾与分析</h2><h3 id="3-1-普通场景-single-stream"><a href="#3-1-普通场景-single-stream" class="headerlink" title="3.1 普通场景(single stream)"></a>3.1 普通场景(single stream)</h3><p>推流端</p>
+<p>以 SRS 的测试网页为例, 打开 <a target="_blank" rel="noopener" href="http://127.0.0.1:8080/players/rtc_publisher.html">http://127.0.0.1:8080/players/rtc_publisher.html</a> 点击 <code>开始推流</code></p>
+<p>浏览器在处理 offer 后, 会将 offer 发给 SRS, SRS 处理 offer 后返回 answer给浏览器并就绪等待收流, 浏览器在获得answer,经过后续步骤后最终推流给 SRS</p>
+<p>播放端</p>
+<p>播放端同样在 SRS 收到浏览器的offer后,回复answer,并准备把推流端的流转发给播放端</p>
+<h3 id="3-2-Simulcast-场景-simulcast-stream"><a href="#3-2-Simulcast-场景-simulcast-stream" class="headerlink" title="3.2 Simulcast 场景 (simulcast stream)"></a>3.2 Simulcast 场景 (simulcast stream)</h3><p>对于支持 Simulcast 场景, 大部份流程与上述分析基本一致, 除了以下几点</p>
+<ul>
+<li>推流端如何生成带有 <code>a=ssrc-group:SIM</code>的sdp, 以及确定 <code>SSRC 序列 &#123;layer0 layer1 layer2...&#125;</code> 的长度</li>
+<li>SRS 如何识别推流端的 <code>a=ssrc-group:SIM</code> </li>
+<li>播放端如何拉取指定layer的流</li>
+</ul>
+<h2 id="4-SRS-开发支持"><a href="#4-SRS-开发支持" class="headerlink" title="4. SRS 开发支持"></a>4. SRS 开发支持</h2><p>经过 <code>3. SRS 处理 RTC 基本流程回顾与分析</code> 后, 得出 Simulcast 场景(simulcast stream)与普通场景(single stream)的几点主要的不同之处, 这个几点不同,实际对应着几个开发需求. 解决它们就解决问题</p>
+<p>额外的, 为了应对Simulcast的细节,我们需要约定一些概念</p>
+<ul>
+<li>numberOfSimulcastLayers: 标示启用Simulcast层级个数, 也就是 <code>SSRC 序列 &#123;layer0 layer1 layer2...&#125;</code> 的长度, 用于推流端, 举例 <code>webrtc://127.0.0.1/live/livestream?numberOfSimulcastLayers=3</code></li>
+<li>layer: 指定播放的哪一层, 用于播放端, 举例 <code>webrtc://127.0.0.1/live/livestream?layer=0</code></li>
+</ul>
+<h3 id="4-1-补充-offer-对-a-ssrc-group-SIM的支持"><a href="#4-1-补充-offer-对-a-ssrc-group-SIM的支持" class="headerlink" title="4.1 补充 offer 对 a=ssrc-group:SIM的支持"></a>4.1 补充 offer 对 <code>a=ssrc-group:SIM</code>的支持</h3><p>补充 offer 对 <code>a=ssrc-group:SIM</code>的支持 主要由 <code>function UpdateNativeCreateOffer(numberOfSimulcastLayers)</code> 完成<br>UpdateNativeCreateOffer 参考 simulcast-playground 项目, 详见 参考2, 其参数 numberOfSimulcastLayers 即为 Simulcast 开的层数</p>
+<p>numberOfSimulcastLayers 取值为 1,2,3; 当 numberOfSimulcastLayers=1 时, Simulcast 场景 (simulcast stream) 向下退化为 普通场景(single stream)</p>
+<p>UpdateNativeCreateOffer 解析offer的视频媒体行的 SSRC 和 RTX SSRC, 将其作为Simulcast的其中一层, 并根据 numberOfSimulcastLayers 取值, 补充剩下的层级, 并将各层的 SSRC 聚合为</p>
+<p><code>SSRC 序列 &#123;layer0 layer1 layer2...&#125;</code> 添加形如 <code>2.1 特点</code> 描述的 <code>a=ssrc-group:SIM layer0 layer1 layer2...</code></p>
+<p>最后组合为新的offer并返回</p>
+<h3 id="4-2-补充-SRS-对-a-ssrc-group-SIM-的解析"><a href="#4-2-补充-SRS-对-a-ssrc-group-SIM-的解析" class="headerlink" title="4.2 补充 SRS 对 a=ssrc-group:SIM 的解析"></a>4.2 补充 SRS 对 <code>a=ssrc-group:SIM</code> 的解析</h3><p>SRS 解析 <code>a=ssrc-group:SIM</code> 保存至 SrsSSRCGroup<br>在获得  <code>a=ssrc-group:SIM</code> 及相应的 <code>SSRC 序列</code> 后, SRS 为 publisher 建立与 <code>SSRC 序列</code> 与之相对应的 video_track_desc, 此后 publisher启动, 处理推流端的各layer的流</p>
+<h3 id="4-3-建立-SSRC-序列-转发映射-SRS-生成并回复正确的-answer"><a href="#4-3-建立-SSRC-序列-转发映射-SRS-生成并回复正确的-answer" class="headerlink" title="4.3 建立 SSRC 序列 转发映射, SRS 生成并回复正确的 answer"></a>4.3 建立 <code>SSRC 序列</code> 转发映射, SRS 生成并回复正确的 answer</h3><p>首先,我们需要知道播放端需要播放哪个层级的视频, 即layer是多少,这个可以在播放端发给offer的消息体中, 扩展一个layer字段, 如</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">var data = &#123;</span><br><span class="line">    api: conf.apiUrl, </span><br><span class="line">    tid: conf.tid, </span><br><span class="line">    streamurl: &#x27;webrtc://127.0.0.1/live/livestream?layer=0&#x27;,</span><br><span class="line">    clientip: null, </span><br><span class="line">    sdp: offer.sdp</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>然后, SRS 解析 streamurl 取得layer后, 以其为索引, 筛选<code>SSRC 序列</code>, 然后查询 pulisher 对应的 video_track_desc, 以此创建 player 所需的 video_track_desc 和 SSRC, 返回给播放端, 并处理后续的player逻辑</p>
+<h2 id="5-操作演示"><a href="#5-操作演示" class="headerlink" title="5. 操作演示"></a>5. 操作演示</h2><h3 id="5-1-启动-SRS"><a href="#5-1-启动-SRS" class="headerlink" title="5.1 启动 SRS"></a>5.1 启动 SRS</h3><p>以 osx 为例</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">git clone https://github.com/ossrs/srs/tree/feature/simulcast</span><br><span class="line">cd srs/track </span><br><span class="line">git checkout feature/simulcast </span><br><span class="line">git pull</span><br><span class="line">./configure --osx &amp;&amp; make -j8</span><br><span class="line">ulimit -HSn 1107</span><br><span class="line">CANDIDATE=$(ifconfig en0 inet| grep inet|awk &#x27;&#123;print $2&#125;&#x27;)</span><br><span class="line">./objs/srs -c conf/rtc.conf</span><br></pre></td></tr></table></figure>
+<h3 id="5-2-操作"><a href="#5-2-操作" class="headerlink" title="5.2 操作"></a>5.2 操作</h3><p>打开推流端 <a target="_blank" rel="noopener" href="http://127.0.0.1:8080/players/rtc_publisher.html">http://127.0.0.1:8080/players/rtc_publisher.html</a></p>
+<p>输入 webrtc://127.0.0.1/live/livestream?numberOfSimulcastLayers=3</p>
+<p>打开播放端 <a target="_blank" rel="noopener" href="http://127.0.0.1:8080/players/rtc_player.html">http://127.0.0.1:8080/players/rtc_player.html</a></p>
+<p>测试 low layer, 输入 webrtc://127.0.0.1/live/livestream?layer=0</p>
+<p>测试 mid layer, 输入  webrtc://127.0.0.1/live/livestream?layer=1</p>
+<p>测试 high layer, 输入  webrtc://127.0.0.1/live/livestream?layer=2</p>
+<p>示例</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/ossrs/srs/pull/2420#issuecomment-864359462">https://github.com/ossrs/srs/pull/2420#issuecomment-864359462</a></p>
+<p><a target="_blank" rel="noopener" href="https://github.com/ossrs/srs/pull/2420#issuecomment-865427561">https://github.com/ossrs/srs/pull/2420#issuecomment-865427561</a></p>
+<h2 id="6-补充"><a href="#6-补充" class="headerlink" title="6. 补充"></a>6. 补充</h2><p>前面 <code>1. Simulcast 介绍</code> 提到, Simulcast 主要存在两种API接口, 本文介绍的 SDP munging 为其一, 另一种 RID based 开发已基本完成, 代码提交和介绍文档随后给出</p>
+<p>体验详见 <a target="_blank" rel="noopener" href="https://github.com/johzzy/srs/tree/johnny/experimental">https://github.com/johzzy/srs/tree/johnny/experimental</a></p>
+<h2 id="7-参考"><a href="#7-参考" class="headerlink" title="7. 参考"></a>7. 参考</h2><ol>
+<li><a target="_blank" rel="noopener" href="https://www.meetecho.com/blog/simulcast-janus-ssrc/">https://www.meetecho.com/blog/simulcast-janus-ssrc/</a><br><a target="_blank" rel="noopener" href="https://webrtchacks.com/not-a-guide-to-sdp-munging/">https://webrtchacks.com/not-a-guide-to-sdp-munging/</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/fippo/simulcast-playground">https://github.com/fippo/simulcast-playground</a><br><a target="_blank" rel="noopener" href="https://fippo.github.io/simulcast-playground/">https://fippo.github.io/simulcast-playground/</a><br><a target="_blank" rel="noopener" href="https://webrtchacks.com/a-playground-for-simulcast-without-an-sfu/">https://webrtchacks.com/a-playground-for-simulcast-without-an-sfu/</a></li>
+</ol>
+<h2 id="8-附录"><a href="#8-附录" class="headerlink" title="8. 附录"></a>8. 附录</h2><p>一份 SDP munging 风格 Simulcast 的 sdp</p>
+<p><a target="_blank" rel="noopener" href="https://gist.github.com/johzzy/067dd46a1222bf211f79aef5bcf4cd3a">https://gist.github.com/johzzy/067dd46a1222bf211f79aef5bcf4cd3a</a></p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://johzzy.github.io/2021/07/22/how-to-support-simulcast-in-srs/" data-id="ckreqxd6o0000ufvq0gaa34wx" class="article-share-link">Share</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/public/tags/simulcast/" rel="tag">simulcast</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-a-mac-bug-about-udp-port-triggered-by-srs" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/public/2021/06/28/a-mac-bug-about-udp-port-triggered-by-srs/" class="article-date">
+  <time datetime="2021-06-28T09:31:04.000Z" itemprop="datePublished">2021-06-28</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/public/2021/06/28/a-mac-bug-about-udp-port-triggered-by-srs/">a mac bug about udp port triggered by srs</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>在srs上,有一个bug困扰我很长时间了, 最近才分析清楚其原因.</p>
+<h3 id="1-问题概述"><a href="#1-问题概述" class="headerlink" title="1 问题概述"></a>1 问题概述</h3><p>在srs中开启rtc,打开浏览器多次publish 和 play 后, 出现ice协商失败的情况;<br>调试发现udp阻塞所致;<br>更换 rtc 端口可暂时解决问题.</p>
+<h3 id="2-问题分析"><a href="#2-问题分析" class="headerlink" title="2 问题分析"></a>2 问题分析</h3><p>在srs中阻塞函数是来自st的st_recvfrom, 可以从<code>srs/trunk/research/st</code> 入手, 设计如下测试 </p>
+<p>问题组<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">server: g++ udp-server.cpp ../../objs/st/libst.a -g -O0 -o udp-server &amp;&amp; ./udp-server 127.0.0.1 8000 3</span><br><span class="line">client: g++ udp-client.cpp ../../objs/st/libst.a -g -O0 -o udp-client &amp;&amp; ./udp-client 127.0.0.1 8000 3</span><br></pre></td></tr></table></figure></p>
+<p>对照组<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">server: g++ udp-server.cpp ../../objs/st/libst.a -g -O0 -o udp-server &amp;&amp; ./udp-server 127.0.0.1 18000 3</span><br><span class="line">client: g++ udp-client.cpp ../../objs/st/libst.a -g -O0 -o udp-client &amp;&amp; ./udp-client 127.0.0.1 18000 3</span><br></pre></td></tr></table></figure></p>
+<p>测试发现问题组server会卡住, 与srs情况一致</p>
+<h3 id="3-更换server的监听ip"><a href="#3-更换server的监听ip" class="headerlink" title="3 更换server的监听ip"></a>3 更换server的监听ip</h3><p>将 server 端 ip 换成 <code>0.0.0.0</code>(即 <code>udp-server 0.0.0.0 8000 3</code> 和 <code>udp-server 0.0.0.0 3</code>)</p>
+<p>测试结果没有变化;</p>
+<p>初步结论是: bug 与 st 有关</p>
+<h3 id="4-调整client"><a href="#4-调整client" class="headerlink" title="4 调整client"></a>4 调整client</h3><p>将 client换成 nc, 具体如下</p>
+<p>问题组<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">server: g++ udp-server.cpp ../../objs/st/libst.a -g -O0 -o udp-server &amp;&amp; ./udp-server 127.0.0.1 8000 3</span><br><span class="line">client: echo &quot;Hello&quot; | nc -4u $CANDIDATE 8000</span><br></pre></td></tr></table></figure><br>对照组<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">server: g++ udp-server.cpp ../../objs/st/libst.a -g -O0 -o udp-server &amp;&amp; ./udp-server 127.0.0.1 18000 3</span><br><span class="line">client: echo &quot;Hello&quot; | nc -4u $CANDIDATE 18000</span><br></pre></td></tr></table></figure></p>
+<p>测试结果与之前一致.</p>
+<h3 id="5-调整server"><a href="#5-调整server" class="headerlink" title="5 调整server"></a>5 调整server</h3><p>再进一步调整测试</p>
+<p>问题组</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">server: nc -u -l 8000</span><br><span class="line">client: echo &quot;Hello&quot; | nc -4u $CANDIDATE 8000</span><br></pre></td></tr></table></figure>
+<p>对照组</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">server: nc -u -l 8000</span><br><span class="line">client: echo &quot;Hello&quot; | nc -4u $CANDIDATE 18000</span><br></pre></td></tr></table></figure>
+<p>测试结果与之前依然一致. 不过,可以排除st的嫌疑了;</p>
+<p>结论是: bug与st无关</p>
+<p>那么,只能是与mac有关了</p>
+<h3 id="6-结论"><a href="#6-结论" class="headerlink" title="6 结论"></a>6 结论</h3><p>综合上述各次测试对比, 这个bug与st无关,与操作系统mac有关. </p>
+<p>能力有限, 这个问题就不再往下分析了,就此记录一下.</p>
+<p>我的系统是<code>macOS Big Sur 11.4</code>, 通过<code>uname -a</code>查看, 具体为 <code>Darwin Kernel Version 20.5.0: Sat May  8 05:10:33 PDT 2021; root:xnu-7195.121.3~9/RELEASE_X86_64 x86_64</code></p>
+<p>不过在升级系统前(macOS 10.15)也同样存在这个问题.</p>
+<p>PS: </p>
+<ol>
+<li>CANDIDATE=$(ifconfig en0 inet| grep inet|awk ‘{print $2}’)</li>
+<li>查看端口占用 lsof -i:8000</li>
+</ol>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://johzzy.github.io/2021/06/28/a-mac-bug-about-udp-port-triggered-by-srs/" data-id="ckqhkhszr0019uavq1ut412su" class="article-share-link">Share</a>
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-simulcast-layer-state-control" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/public/2021/06/23/simulcast-layer-state-control/" class="article-date">
+  <time datetime="2021-06-23T09:08:04.000Z" itemprop="datePublished">2021-06-23</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/public/2021/06/23/simulcast-layer-state-control/">simulcast layer state control</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>simulcast 层级状态控制</p>
+<p>webrtc通过 StreamContext 表示simulcast的层级概念</p>
+<p>如果需要暂停simulcast某层的工作,设置 layer_context.set_is_paused(true)即可,webrtc代码引用如下<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">for (StreamContext&amp; layer_context : stream_contexts_) &#123;</span><br><span class="line">  int stream_idx = layer_context.stream_idx();</span><br><span class="line">  uint32_t stream_bitrate_kbps =</span><br><span class="line">      parameters.bitrate.GetSpatialLayerSum(stream_idx) / 1000;</span><br><span class="line"></span><br><span class="line">  // Need a key frame if we have not sent this stream before.</span><br><span class="line">  if (stream_bitrate_kbps &gt; 0 &amp;&amp; layer_context.is_paused()) &#123;</span><br><span class="line">    layer_context.set_is_keyframe_needed();</span><br><span class="line">  &#125;</span><br><span class="line">  layer_context.set_is_paused(stream_bitrate_kbps == 0);</span><br><span class="line">  ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>设置后,webrtc会在以下逻辑中使用它<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">for (auto&amp; layer : stream_contexts_) &#123;</span><br><span class="line">  // Don&#x27;t encode frames in resolutions that we don&#x27;t intend to send.</span><br><span class="line">  if (layer.is_paused()) &#123;</span><br><span class="line">    continue;</span><br><span class="line">  &#125;</span><br><span class="line">  ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>有上述代码可知, parameters.bitrate.GetSpatialLayerSum(stream_idx) 控制着 layer_context 的状态 state(actived/paused), 进而通过控制 layer_context 控制编码器工作 </p>
+<p>那么从哪里修改 parameters.bitrate 呢? 外部接口如何操作它呢?</p>
+<p>(待续未完 …)</p>
+<p>MediaStreamTrack.SetEnabled<br>JNI_MediaStreamTrack_SetEnabled<br>MediaStreamTrackInterface<br>VideoTrackInterface<br>VideoTrack<br>VideoTrackSource::AddOrUpdateSink(video_source_-&gt;AddOrUpdateSink)<br>AdaptedVideoTrackSource::AddOrUpdateSink<br>VideoBroadcaster::AddOrUpdateSink<br>VideoSourceBase::AddOrUpdateSink, UpdateWants</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://johzzy.github.io/2021/06/23/simulcast-layer-state-control/" data-id="ckqhkhszv001kuavqf00xdmtl" class="article-share-link">Share</a>
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-simulcast-support-in-srs" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/public/2021/06/18/simulcast-support-in-srs/" class="article-date">
+  <time datetime="2021-06-18T10:50:41.000Z" itemprop="datePublished">2021-06-18</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/public/2021/06/18/simulcast-support-in-srs/">simulcast support in srs</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>最近弄明白了 Simulcast, 就给 SRS 加了 Simulcast 功能支持, 不过是 Chrome 独有的 SDP munging 风格的 Simulcast, 以后了解清楚了标准的 Simulcast 格式再完善一下.</p>
+<p>PR 详见 <a target="_blank" rel="noopener" href="https://github.com/ossrs/srs/pull/2420">https://github.com/ossrs/srs/pull/2420</a></p>
+<h2 id="发布端"><a href="#发布端" class="headerlink" title="发布端"></a>发布端</h2><p>使用  <code>numberOfSimulcastLayers</code> 标示 Simulcast 层级数, 可选的有效值为 1,2,3; 其中1为默认值, 此外的其他值为无效值, 若误用会重置为默认1.</p>
+<p><code>numberOfSimulcastLayers = 1</code> 相当于 <code>Simulcast 流</code> 退化为 <code>单流</code></p>
+<pre><code>webrtc://127.0.0.1/live/livestream?numberOfSimulcastLayers=1  (相当于单流)
+webrtc://127.0.0.1/live/livestream?numberOfSimulcastLayers=2  (2 层 Simulcast 流)
+webrtc://127.0.0.1/live/livestream?numberOfSimulcastLayers=3  (3 层 Simulcast 流)
+</code></pre><h2 id="播放端"><a href="#播放端" class="headerlink" title="播放端"></a>播放端</h2><p>播放端使用 <code>layer</code> 选择哪一层视频流,可选的有效值为 0,1,2,3,…<br>如果 <code>layer</code> 对应的视频流无法播放,则退化为一般场景的播放端.</p>
+<pre><code>low: webrtc://127.0.0.1/live/livestream?layer=0
+mid: webrtc://127.0.0.1/live/livestream?layer=1
+high: webrtc://127.0.0.1/live/livestream?layer=2
+other1: webrtc://127.0.0.1/live/livestream?layer=1,2
+other2: webrtc://127.0.0.1/live/livestream?layer=1,2&amp;foo=bar
+</code></pre>
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://johzzy.github.io/2021/06/18/simulcast-support-in-srs/" data-id="ckqhkhszt001euavq1kolbffz" class="article-share-link">Share</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/public/tags/webrtc/" rel="tag">webrtc</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-simulcast" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/public/2021/06/16/simulcast/" class="article-date">
+  <time datetime="2021-06-16T09:26:05.000Z" itemprop="datePublished">2021-06-16</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/public/2021/06/16/simulcast/">Simulcast</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>Simulcast, 效果演示可以参考这个项目 <a target="_blank" rel="noopener" href="https://fippo.github.io/simulcast-playground/">simulcast-playground</a></p>
+<h3 id="H264EncoderImpl-实现"><a href="#H264EncoderImpl-实现" class="headerlink" title="H264EncoderImpl 实现"></a>H264EncoderImpl 实现</h3><p>就 H264 而言, H264EncoderImpl 实现了Simulcast 功能, 为了使用 H264EncoderImpl, 需要webrtc编译ffmpeg和openh264, 代码可以参考 <a target="_blank" rel="noopener" href="https://github.com/johzzy/webrtc-mirror/tree/feature/h264">https://github.com/johzzy/webrtc-mirror/tree/feature/h264</a></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">// modules/video_coding/codecs/h264/h264_encoder_impl.cc</span><br><span class="line">int32_t H264EncoderImpl::InitEncode(const VideoCodec* inst,</span><br><span class="line">                                    const VideoEncoder::Settings&amp; settings) &#123;</span><br><span class="line">    ...</span><br><span class="line">    for (int i = 0, idx = number_of_streams - 1; i &lt; number_of_streams;</span><br><span class="line">       ++i, --idx) &#123;</span><br><span class="line">    ISVCEncoder* openh264_encoder;</span><br><span class="line">    // Create encoder.</span><br><span class="line">    if (WelsCreateSVCEncoder(&amp;openh264_encoder) != 0) &#123;</span><br><span class="line">      // Failed to create encoder.</span><br><span class="line">      RTC_LOG(LS_ERROR) &lt;&lt; &quot;Failed to create OpenH264 encoder&quot;;</span><br><span class="line">      RTC_DCHECK(!openh264_encoder);</span><br><span class="line">      Release();</span><br><span class="line">      ReportError();</span><br><span class="line">      return WEBRTC_VIDEO_CODEC_ERROR;</span><br><span class="line">    &#125;</span><br><span class="line">    RTC_DCHECK(openh264_encoder);</span><br><span class="line">    if (kOpenH264EncoderDetailedLogging) &#123;</span><br><span class="line">      int trace_level = WELS_LOG_DETAIL;</span><br><span class="line">      openh264_encoder-&gt;SetOption(ENCODER_OPTION_TRACE_LEVEL, &amp;trace_level);</span><br><span class="line">    &#125;</span><br><span class="line">    // else WELS_LOG_DEFAULT is used by default.</span><br><span class="line"></span><br><span class="line">    // Store h264 encoder.</span><br><span class="line">    encoders_[i] = openh264_encoder;</span><br><span class="line">        ...</span><br></pre></td></tr></table></figure>
+<p>从 <code>H264EncoderImpl::InitEncode</code> 函数可以看到, 真正负责编码工作的对象是 <code>ISVCEncoder* openh264_encoder;</code>, <code>Simulcast</code> 和 <code>SVC</code> 都可以由它完成.</p>
+<p>在 <code>Android/iOS</code> 等移动端, <code>H264EncoderImpl</code> 实现的 <code>Simulcast</code> 因 <code>OpenH264</code> 软件编码的缘故, 往往有CPU算力和电池续航方面的不足. </p>
+<p>另外, <code>WebRTC iOS</code>编译 <code>FFmpeg</code> 和 <code>OpenH264</code> 依然是一个巨坑. 那么有没有利用硬件编码实现的Simulcast呢.</p>
+<h3 id="SimulcastEncoderAdapter-实现"><a href="#SimulcastEncoderAdapter-实现" class="headerlink" title="SimulcastEncoderAdapter 实现"></a>SimulcastEncoderAdapter 实现</h3><p><code>SimulcastEncoderAdapter</code> 代码详见 <code>media/engine/simulcast_encoder_adapter.cc</code>, 它本身是一个通用的适配器, 给SimulcastEncoderAdapter 传入相应的编码器工厂，就可以组成一个simulcast的编码器, </p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">SimulcastEncoderAdapter::SimulcastEncoderAdapter(VideoEncoderFactory* factory,</span><br><span class="line">                                                 const SdpVideoFormat&amp; format)</span><br><span class="line">    : SimulcastEncoderAdapter(factory, nullptr, format) &#123;&#125;</span><br></pre></td></tr></table></figure>
+<p>具体来说, 在 <code>Android</code> 平台,可以给 <code>SimulcastEncoderAdapter</code> 传入 <code>mediacodec</code> 的 <code>h264</code> 编码器开启硬编,在 <code>iOS</code> 平台则可以传入 <code>videotoolbox</code>. 当然,你可以 SimulcastEncoderAdapter 做到不同层级的视频使用不同的编码器, 混合使用.</p>
+<p>在 chrome 中 h264 的 simulcast 就是这样实现的，在 <code>chrome://webrtc-internals</code> 如果看到这样的字符串,就是 <code>SimulcastEncoderAdapter</code> 实现的</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">encoderImplementation SimulcastEncoderAdapter (OpenH264, ExternalEncoder, ExternalEncoder)</span><br></pre></td></tr></table></figure>
+<p>android 平台利用 SimulcastEncoderAdapter 开启 simulcast 的一种实例</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">// SimulcastEncoderAdapter::GetEncoderInfo().implementation_name 输出</span><br><span class="line">// 其中 OpenH264 编码小流, HWEncoder 编码大流</span><br><span class="line">SimulcastEncoderAdapter (OpenH264, HWEncoder)</span><br></pre></td></tr></table></figure>
+<h3 id="如何使用-SimulcastEncoderAdapter"><a href="#如何使用-SimulcastEncoderAdapter" class="headerlink" title="如何使用 SimulcastEncoderAdapter"></a>如何使用 SimulcastEncoderAdapter</h3><p>可以参考 chromium blink 的使用方式,具体代码见 <code>third_party/blink/renderer/platform/peerconnection/video_codec_factory.cc</code></p>
+<h4 id="创建相应工厂"><a href="#创建相应工厂" class="headerlink" title="创建相应工厂"></a>创建相应工厂</h4><p>仿照 blink 创建 EncoderAdapter 和 CreateVideoEncoderAdapterFactory<br><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">// @see </span><br><span class="line">template &lt;typename Factory&gt;</span><br><span class="line">bool IsFormatSupported(const Factory* factory,</span><br><span class="line">                       const webrtc::SdpVideoFormat&amp; format) &#123;</span><br><span class="line">  return factory &amp;&amp; IsFormatSupported(factory-&gt;GetSupportedFormats(), format);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// Merge |formats1| and |formats2|, but avoid adding duplicate formats.</span><br><span class="line">std::vector&lt;webrtc::SdpVideoFormat&gt; MergeFormats(</span><br><span class="line">    std::vector&lt;webrtc::SdpVideoFormat&gt; formats1,</span><br><span class="line">    const std::vector&lt;webrtc::SdpVideoFormat&gt;&amp; formats2) &#123;</span><br><span class="line">  for (const webrtc::SdpVideoFormat&amp; format : formats2) &#123;</span><br><span class="line">    // Don&#x27;t add same format twice.</span><br><span class="line">    if (!IsFormatSupported(formats1, format))</span><br><span class="line">      formats1.push_back(format);</span><br><span class="line">  &#125;</span><br><span class="line">  return formats1;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// This class combines a hardware factory with the internal factory and adds</span><br><span class="line">// internal SW codecs, simulcast, and SW fallback wrappers.</span><br><span class="line">class EncoderAdapter : public webrtc::VideoEncoderFactory &#123;</span><br><span class="line"> public:</span><br><span class="line">  explicit EncoderAdapter(</span><br><span class="line">      std::unique_ptr&lt;webrtc::VideoEncoderFactory&gt; hardware_encoder_factory)</span><br><span class="line">      : hardware_encoder_factory_(std::move(hardware_encoder_factory)) &#123;&#125;</span><br><span class="line"></span><br><span class="line">  webrtc::VideoEncoderFactory::CodecInfo QueryVideoEncoder(</span><br><span class="line">      const webrtc::SdpVideoFormat&amp; format) const override &#123;</span><br><span class="line">    const webrtc::VideoEncoderFactory* factory =</span><br><span class="line">        IsFormatSupported(hardware_encoder_factory_.get(), format)</span><br><span class="line">            ? hardware_encoder_factory_.get()</span><br><span class="line">            : &amp;software_encoder_factory_;</span><br><span class="line">    return factory-&gt;QueryVideoEncoder(format);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  std::unique_ptr&lt;webrtc::VideoEncoder&gt; CreateVideoEncoder(</span><br><span class="line">      const webrtc::SdpVideoFormat&amp; format) override &#123;</span><br><span class="line">    const bool supported_in_software =</span><br><span class="line">        IsFormatSupported(&amp;software_encoder_factory_, format);</span><br><span class="line">    const bool supported_in_hardware =</span><br><span class="line">        IsFormatSupported(hardware_encoder_factory_.get(), format);</span><br><span class="line"></span><br><span class="line">    if (!supported_in_software &amp;&amp; !supported_in_hardware)</span><br><span class="line">      return nullptr;</span><br><span class="line"></span><br><span class="line">    if (absl::EqualsIgnoreCase(format.name.c_str(),</span><br><span class="line">                                         cricket::kVp9CodecName) ||</span><br><span class="line">        absl::EqualsIgnoreCase(format.name.c_str(),</span><br><span class="line">                                         cricket::kAv1CodecName)) &#123;</span><br><span class="line">      // For VP9 and AV1 we don&#x27;t use simulcast.</span><br><span class="line">      // return software_encoder_factory_.CreateVideoEncoder(format);</span><br><span class="line">      return hardware_encoder_factory_-&gt;CreateVideoEncoder(format);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if (!supported_in_hardware || !hardware_encoder_factory_.get()) &#123;</span><br><span class="line">      return std::make_unique&lt;webrtc::SimulcastEncoderAdapter&gt;(</span><br><span class="line">          &amp;software_encoder_factory_, nullptr, format);</span><br><span class="line">    &#125; else if (!supported_in_software) &#123;</span><br><span class="line">      return std::make_unique&lt;webrtc::SimulcastEncoderAdapter&gt;(</span><br><span class="line">          hardware_encoder_factory_.get(), nullptr, format);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return std::make_unique&lt;webrtc::SimulcastEncoderAdapter&gt;(</span><br><span class="line">        hardware_encoder_factory_.get(), &amp;software_encoder_factory_, format);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  std::vector&lt;webrtc::SdpVideoFormat&gt; GetSupportedFormats() const override &#123;</span><br><span class="line">    std::vector&lt;webrtc::SdpVideoFormat&gt; software_formats =</span><br><span class="line">        software_encoder_factory_.GetSupportedFormats();</span><br><span class="line">    return hardware_encoder_factory_</span><br><span class="line">               ? MergeFormats(software_formats,</span><br><span class="line">                              hardware_encoder_factory_-&gt;GetSupportedFormats())</span><br><span class="line">               : software_formats;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line"> private:</span><br><span class="line">  webrtc::InternalEncoderFactory software_encoder_factory_;</span><br><span class="line">  const std::unique_ptr&lt;webrtc::VideoEncoderFactory&gt; hardware_encoder_factory_;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">std::unique_ptr&lt;VideoEncoderFactory&gt; CreateVideoEncoderAdapterFactory(</span><br><span class="line">  std::unique_ptr&lt;webrtc::VideoEncoderFactory&gt; hardware_encoder_factory) &#123;</span><br><span class="line">  return std::make_unique&lt;EncoderAdapter&gt;(std::move(hardware_encoder_factory));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<h4 id="使用工厂"><a href="#使用工厂" class="headerlink" title="使用工厂"></a>使用工厂</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">//  ios 使用</span><br><span class="line">        auto video_encoder_factory = std::move(native_encoder_factory);</span><br><span class="line">        return [self initWithNativeAudioEncoderFactory:webrtc::CreateBuiltinAudioEncoderFactory()</span><br><span class="line">                             nativeAudioDecoderFactory:webrtc::CreateBuiltinAudioDecoderFactory()</span><br><span class="line">                             nativeVideoEncoderFactory:webrtc::CreateVideoEncoderAdapterFactory(std::move(video_encoder_factory))</span><br><span class="line">                             nativeVideoDecoderFactory:webrtc::CreateBuiltinVideoDecoderFactory()</span><br><span class="line">                                     audioDeviceModule:[self audioDeviceModule]</span><br><span class="line">                                 audioProcessingModule:nullptr];</span><br><span class="line">// android 使用</span><br><span class="line">  cricket::MediaEngineDependencies media_dependencies;</span><br><span class="line">  media_dependencies.task_queue_factory = dependencies.task_queue_factory.get();</span><br><span class="line">  media_dependencies.adm = std::move(audio_device_module);</span><br><span class="line">  media_dependencies.audio_encoder_factory = std::move(audio_encoder_factory);</span><br><span class="line">  media_dependencies.audio_decoder_factory = std::move(audio_decoder_factory);</span><br><span class="line">  media_dependencies.audio_processing = std::move(audio_processor);</span><br><span class="line">  auto video_encoder_factory =</span><br><span class="line">      absl::WrapUnique(CreateVideoEncoderFactory(jni, jencoder_factory));</span><br><span class="line">  media_dependencies.video_encoder_factory = </span><br><span class="line">        CreateVideoEncoderAdapterFactory(std::move(video_encoder_factory));</span><br><span class="line">  media_dependencies.video_decoder_factory =</span><br><span class="line">      absl::WrapUnique(CreateVideoDecoderFactory(jni, jdecoder_factory));</span><br><span class="line">  dependencies.media_engine =</span><br><span class="line">      cricket::CreateMediaEngine(std::move(media_dependencies));</span><br><span class="line"></span><br><span class="line">  rtc::scoped_refptr&lt;PeerConnectionFactoryInterface&gt; factory =</span><br><span class="line">      CreateModularPeerConnectionFactory(std::move(dependencies));</span><br></pre></td></tr></table></figure>
+<p>参考: <a target="_blank" rel="noopener" href="https://blog.jianchihu.net/webrtc-research-simulcast-layer-change.html">https://blog.jianchihu.net/webrtc-research-simulcast-layer-change.html</a></p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://johzzy.github.io/2021/06/16/simulcast/" data-id="ckqhkhszv001iuavqhaqleb7d" class="article-share-link">Share</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/public/tags/webrtc/" rel="tag">webrtc</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-field-trails" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/public/2021/06/01/field-trails/" class="article-date">
+  <time datetime="2021-06-01T11:34:12.000Z" itemprop="datePublished">2021-06-01</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/public/2021/06/01/field-trails/">Field Trails</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="Field-Trials-介绍"><a href="#Field-Trials-介绍" class="headerlink" title="Field Trials 介绍"></a>Field Trials 介绍</h2><p>field trials （试用特性）是Chrome 的一种特性开关机制，WebRTC沿用了它。其本质是一种特定格式的字符串，格式如下：</p>
+<pre><code>&quot;FieldTrialName1/Enabled/FieldTrialName2/Disabled/FieldTrialName3/Disabled/&quot;
+</code></pre><h3 id="最简格式为空字符串"><a href="#最简格式为空字符串" class="headerlink" title="最简格式为空字符串"></a>最简格式为空字符串</h3><pre><code>&quot;&quot;
+</code></pre><h3 id="基本单元"><a href="#基本单元" class="headerlink" title="基本单元"></a>基本单元</h3><pre><code>&quot;FieldTrialName/FieldTrialValue/&quot;
+</code></pre><h3 id="FieldTrialValue的有效值"><a href="#FieldTrialValue的有效值" class="headerlink" title="FieldTrialValue的有效值"></a>FieldTrialValue的有效值</h3><p>常见的FieldTrialValue取值有 Enabled 和 Disabled，一些例外的还有形如 Default，EnabledByFlag_2SL3TL，比如</p>
+<pre><code>WebRTC-H264Simulcast/Enabled/
+WebRTC-LegacySimulcastLayerLimit/Disabled/
+WebRTC-SupportVP9SVC/Default/
+WebRTC-SupportVP9SVC/EnabledByFlag_2SL3TL/
+WebRTC-Vp9InterLayerPred/Enabled,inter_layer_pred_mode:off/
+WebRTC-Vp9InterLayerPred/Enabled,inter_layer_pred_mode:on/
+WebRTC-Vp9InterLayerPred/Enabled,inter_layer_pred_mode:onkeypic/
+WebRTC-VP8-Forced-Fallback-Encoder-v2/Enabled-1,2,34567/
+// 开启 Audio-NetEqExtraDelay 值为 120ms
+WebRTC-Audio-NetEqExtraDelay/Enabled-120/
+</code></pre><p>特殊例子中FieldTrialValue的具体含义取决于相应代码的解释，一般以Enabled开头</p>
+<p>在chrome浏览器中，可以打开 chrome://flags 查看 FieldTrials</p>
+<h2 id="WebRTC利用它完成了什么？"><a href="#WebRTC利用它完成了什么？" class="headerlink" title="WebRTC利用它完成了什么？"></a>WebRTC利用它完成了什么？</h2><pre><code>constexpr char kUseLegacySimulcastLayerLimitFieldTrial[] =
+    &quot;WebRTC-LegacySimulcastLayerLimit&quot;;
+
+
+if (!absl::StartsWith(trials.Lookup(kUseLegacySimulcastLayerLimitFieldTrial), &quot;Disabled&quot;)) &#123;
+// Case A: kUseLegacySimulcastLayerLimitFieldTrial is Enabled
+&#125; else &#123;
+// Case B: kUseLegacySimulcastLayerLimitFieldTrial is Disabled
+&#125;
+</code></pre><p>当我们设置的 fieldtrials 中包含 “WebRTC-LegacySimulcastLayerLimit/Disabled” 则走到 Case B，包含 “WebRTC-LegacySimulcastLayerLimit/Enabled” 则走到 Case A。</p>
+<p>思考：都不包含会走A还是B？</p>
+<h2 id="FieldTrials-如何使用？"><a href="#FieldTrials-如何使用？" class="headerlink" title="FieldTrials 如何使用？"></a>FieldTrials 如何使用？</h2><pre><code>// c++ @see https://github.com/johzzy/webrtc-mirror/blob/master/system_wrappers/include/field_trial.h#L83
+webrtc::field_trial::InitFieldTrialsFromString(const char* trials_string);
+// 举例
+webrtc::field_trial::InitFieldTrialsFromString(&quot;Audio/Enabled/Video/Disabled/&quot;);
+
+
+
+// java @see https://github.com/johzzy/webrtc-mirror/blob/master/sdk/android/api/org/webrtc/PeerConnectionFactory.java#L99
+public PeerConnectionFactory.InitializationOptions.Builder setFieldTrials(String fieldTrials)
+// 举例
+String fieldTrials = &quot;WebRTC-LegacySimulcastLayerLimit/Disabled/&quot;;
+PeerConnectionFactory.initialize(
+        PeerConnectionFactory.InitializationOptions.builder(context)
+                .setFieldTrials(fieldTrials)
+                .setEnableInternalTracer(true)
+                .createInitializationOptions());
+// oc @see https://github.com/johzzy/webrtc-mirror/blob/master/sdk/objc/api/peerconnection/RTCFieldTrials.h#L33
+void RTCInitFieldTrialDictionary(NSDictionary&lt;NSString *, NSString *&gt; *fieldTrials) &#123;
+if (!fieldTrials) &#123;
+    RTCLogWarning(@&quot;No fieldTrials provided.&quot;);
+    return;
+&#125;
+// Assemble the keys and values into the field trial string.
+// We don&apos;t perform any extra format checking. That should be done by the underlying WebRTC calls.
+NSMutableString *fieldTrialInitString = [NSMutableString string];
+for (NSString *key in fieldTrials) &#123;
+    NSString *fieldTrialEntry = [NSString stringWithFormat:@&quot;%@/%@/&quot;, key, fieldTrials[key]];
+    [fieldTrialInitString appendString:fieldTrialEntry];
+&#125;
+size_t len = fieldTrialInitString.length + 1;
+gFieldTrialInitString.reset(new char[len]);
+if (![fieldTrialInitString getCString:gFieldTrialInitString.get()
+                            maxLength:len
+                            encoding:NSUTF8StringEncoding]) &#123;
+    RTCLogError(@&quot;Failed to convert field trial string.&quot;);
+    return;
+&#125;
+webrtc::field_trial::InitFieldTrialsFromString(gFieldTrialInitString.get());
+&#125;
+
+
+举例
+NSDictionary *fieldTrials = @&#123;&#125;;
+RTCInitFieldTrialDictionary(fieldTrials);
+
+
+// 命令行
+--force-fieldtrials=WebRTC-H264Simulcast/Enabled/
+</code></pre><h2 id="FieldTrials-实现"><a href="#FieldTrials-实现" class="headerlink" title="FieldTrials 实现"></a>FieldTrials 实现</h2><pre><code>https://github.com/johzzy/webrtc-mirror/blob/master/system_wrappers/include/field_trial.h
+https://github.com/johzzy/webrtc-mirror/blob/master/system_wrappers/source/field_trial_unittest.cc
+</code></pre><h2 id="FieldTrials-应用示例"><a href="#FieldTrials-应用示例" class="headerlink" title="FieldTrials 应用示例"></a>FieldTrials 应用示例</h2><p>使用 WebRTC-PcFactoryDefaultBitrates 控制码率</p>
+<pre><code>WebRTC-PcFactoryDefaultBitrates/Enabled,min:60,max:4000,start:600/
+</code></pre><p>码率控制也可以通过sdp进行（相比FieldTrials，sdp设置的优先级更高）</p>
+<pre><code>a=fmtp:102 level-asymmetry-allowed=1;packetization-mode=1;x-google-min-bitrate=400;x-google-max-bitrate=600;profile-level-id=42e01f
+</code></pre>
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://johzzy.github.io/2021/06/01/field-trails/" data-id="ckqhkhszs001cuavq2mcz54tr" class="article-share-link">Share</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/public/tags/webrtc/" rel="tag">webrtc</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-2018-05-13-ffmpeg-scale-samples" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/public/2018/05/13/2018-05-13-ffmpeg-scale-samples/" class="article-date">
+  <time datetime="2018-05-13T09:49:16.000Z" itemprop="datePublished">2018-05-13</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/public/2018/05/13/2018-05-13-ffmpeg-scale-samples/">ffmpeg scale samples</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>ffmpeg 音量增益</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// https://www.ffmpeg.org/doxygen/2.7/af__volume_8c_source.html</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// static inline int16_t av_clip_int16(int a)</span></span><br><span class="line"><span class="comment">// &#123;</span></span><br><span class="line"><span class="comment">//     if ((a+0x8000U) &amp; ~0xFFFF) return (a&gt;&gt;31) ^ 0x7FFF;</span></span><br><span class="line"><span class="comment">//     else                      return a;</span></span><br><span class="line"><span class="comment">// &#125;</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">void</span> <span class="title">scaleSamplesS16Volume</span><span class="params">(<span class="keyword">uint8_t</span> *dst, <span class="keyword">int</span> nb_samples, <span class="keyword">double</span> adjustVolumeValue)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int16_t</span> *smp_dst       = (<span class="keyword">int16_t</span> *)dst;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">int</span> volume = (<span class="keyword">int</span>)(adjustVolumeValue * <span class="number">256</span> + <span class="number">0.5</span>);</span><br><span class="line">    <span class="comment">// volume &lt; if (vol-&gt;volume_i &lt; 0x1000000)</span></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;\r====%d %lf   &quot;</span>, volume, adjustVolumeValue);</span><br><span class="line">    <span class="keyword">if</span> (volume &lt; <span class="number">0x1000000</span>) &#123;</span><br><span class="line">        <span class="comment">// vol-&gt;scale_samples = scale_samples_u8_small;</span></span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; nb_samples; ++i) &#123;</span><br><span class="line">            smp_dst[i] = av_clip_int16((smp_dst[i] * volume + <span class="number">128</span>) &gt;&gt; <span class="number">8</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">// vol-&gt;scale_samples = scale_samples_u8;</span></span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; nb_samples; ++i) &#123;</span><br><span class="line">            smp_dst[i] = av_clip_int16(((<span class="keyword">int64_t</span>)smp_dst[i] * volume + <span class="number">128</span>) &gt;&gt; <span class="number">8</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://johzzy.github.io/2018/05/13/2018-05-13-ffmpeg-scale-samples/" data-id="ckqhkhszq0016uavq0xwn0l99" class="article-share-link">Share</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/public/tags/ffmpeg/" rel="tag">ffmpeg</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-2016-08-29-单引号-字符串" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/public/2016/08/29/2016-08-29-%E5%8D%95%E5%BC%95%E5%8F%B7-%E5%AD%97%E7%AC%A6%E4%B8%B2/" class="article-date">
+  <time datetime="2016-08-29T02:23:40.000Z" itemprop="datePublished">2016-08-29</time>
+</a>
+    
+  <div class="article-category">
+    <a class="article-category-link" href="/public/categories/%E6%9C%AA%E5%88%86%E7%B1%BB/">未分类</a>
+  </div>
+
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/public/2016/08/29/2016-08-29-%E5%8D%95%E5%BC%95%E5%8F%B7-%E5%AD%97%E7%AC%A6%E4%B8%B2/">单引号 字符串</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>阅读项目发现的一段代码</p>
+<pre><code>struct PACK_HEAD // 新结构，与类型长度无关
+&#123;
+    ULONG synch   :16;        //同步字节
+    ULONG version : 8;        //协议版本
+    ULONG type    : 8;        //包类型
+    ULONG sn      :32;        //包序列号
+    ULONG fun     :32;        //主功能号
+    ULONG sub     :32;        //子功能号
+    ULONG datalen :32;        //数据域总长
+    ULONG retcode :32;        //返回码
+    ULONG total   :16;        //包的分片总数
+    ULONG index   :16;        //包的分片序号,从0开始
+    ULONG patch   :24;        //补位字节,使结构长度适应4字节对齐方式
+    ULONG checksum: 8;        //异或校验和
+&#125; m_head;
+...
+if(this-&gt;m_head.sub == &apos;REC&apos;)              
+&#123;
+    WriteDebugLog(&quot;录像查询: [%s]&quot;, pTask-&gt;m_body.data);    
+        todo_other(...);            
+&#125;
+
+this-&gt;m_head.sub == &apos;REC&apos; 这句是什么意思
+&apos;REC&apos; 是什么类型
+</code></pre><p>查询资料得知这是一种数据表示，测试代码如下</p>
+<pre><code>#include &lt;cstdio&gt;
+#include &lt;cstdlib&gt;
+#include &lt;ctime&gt;
+
+#define WriteErrorLog(format, ...) \
+    do &#123;\
+    time_t nowtime = time(NULL); struct tm* local = localtime(&amp;nowtime); char timestramp[80] = &#123;0&#125;; strftime(timestramp, 80, &quot;%Y-%m-%d %H:%M:%S&quot;, local);\
+    fprintf(stderr, &quot;%s [ERROR] %s(%d): &quot;format&quot;\n&quot;, timestramp, __FUNCTION__ , __LINE__, __VA_ARGS__); \
+    &#125; while(0)
+
+
+int main()
+&#123;    
+    int ab = &apos;AB&apos;;
+    int a = &apos;A&apos;;
+    int b = &apos;B&apos;;
+    int a_b = (&apos;A&apos; &lt;&lt; 8) + &apos;B&apos;;
+
+    WriteErrorLog(&quot;A:%d, B:%d&quot;, a, b);
+    WriteErrorLog(&quot;ab: %d&quot;, ab);
+    WriteErrorLog(&quot;a_b: %d&quot;, a_b);
+
+    system(&quot;pause&quot;);
+    return 0;
+&#125;
+</code></pre><p><img src="20160829101359.png," alt="cmd" title="cmd"></p>
+<p>‘AB’ 与 12 类比:</p>
+<pre><code>&apos;AB&apos; 表示  &apos;A&apos; * 2^8 + &apos;B&apos;
+12   表示 1 * 10^1 + 2
+</code></pre><p>注意</p>
+<pre><code>data_type var = &apos;ABCD&apos;;
+这里 &apos;ABCD&apos; 需要在 data_type (char short int long) 的取值范围内, 不可越界.
+</code></pre>
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://johzzy.github.io/2016/08/29/2016-08-29-%E5%8D%95%E5%BC%95%E5%8F%B7-%E5%AD%97%E7%AC%A6%E4%B8%B2/" data-id="ckqhkhszm000uuavq8cff0ebq" class="article-share-link">Share</a>
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-2016-07-28-centos_upgrade_python" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/public/2016/07/28/2016-07-28-centos_upgrade_python/" class="article-date">
+  <time datetime="2016-07-28T01:46:14.000Z" itemprop="datePublished">2016-07-28</time>
+</a>
+    
+  <div class="article-category">
+    <a class="article-category-link" href="/public/categories/%E6%9C%AA%E5%88%86%E7%B1%BB/">未分类</a>
+  </div>
+
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/public/2016/07/28/2016-07-28-centos_upgrade_python/">CentOS 升级 Python 整理记录</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>CentOS 升级 Python 整理记录</p>
+<pre><code>CentOS 版本: 6.0 (x64)
+Python 原版本： 2.6.5
+Python 升级版本：2.7.12
+Python 2.7.12 链接： https://www.python.org/ftp/python/2.7.12/Python-2.7.12.tar.xz
+</code></pre><p>执行过程</p>
+<pre><code># 预先准备
+cd /usr/bin
+python --version
+
+# 拷贝 python2.6.5 副本
+cp python python2.6.5  # 安全起见(1)
+
+# 修改下述三个文件开头, 指定 python 解释器为 /usr/bin/python2.6.5
+# 原因是它们不支持 python27
+vim /usr/bin/yum
+vim /usr/bin/ibus-setup
+vim /usr/libexec/ibus-ui-gtk
+
+# 下载安装
+wget https://www.python.org/ftp/python/2.7.12/Python-2.7.12.tar.xz
+tar xf Python-2.7.12.tar.xz
+cd Python-2.7.12
+./configure
+make all
+make install
+make clean
+make distclean
+/usr/local/bin/python2.7 --version
+rm /usr/bin/python # 呼应上文命令(1)
+ln -s /usr/local/bin/python2.7 /usr/bin/python
+
+# 安装后
+## 修复 或 安装 pip
+yum install python-pip
+pip install --upgrade setuptools
+wget --no-check-certificate  https://raw.github.com/pypa/pip/master/contrib/get-pip.py # 命令(3)
+wget --no-check-certificate  https://bootstrap.pypa.io/get-pip.py                      # 命令(4)
+
+# 尝试运行 命令 (3, 4) 下载的脚本, 至此 pip 修复完成 
+python get-pip.py
+pip --version
+pip install bs4
+pip install requests
+
+# 小工具
+yum install dos2unix lrzsz
+</code></pre>
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://johzzy.github.io/2016/07/28/2016-07-28-centos_upgrade_python/" data-id="ckqhkhszl000ruavq4pmn2pzl" class="article-share-link">Share</a>
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+
+
+  <nav id="page-nav">
+    
+    <span class="page-number current">1</span><a class="page-number" href="/public/page/2/">2</a><a class="page-number" href="/public/page/3/">3</a><a class="extend next" rel="next" href="/public/page/2/">Next &amp;raquo;</a>
+  </nav>
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Categories</h3>
+    <div class="widget">
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/public/categories/%E6%9C%AA%E5%88%86%E7%B1%BB/">未分类</a><span class="category-list-count">16</span></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tags</h3>
+    <div class="widget">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/public/tags/C/" rel="tag">C++</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/public/tags/FTP/" rel="tag">FTP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/public/tags/Python/" rel="tag">Python</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/public/tags/ffmpeg/" rel="tag">ffmpeg</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/public/tags/lambda/" rel="tag">lambda</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/public/tags/shell/" rel="tag">shell</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/public/tags/simulcast/" rel="tag">simulcast</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/public/tags/webrtc/" rel="tag">webrtc</a><span class="tag-list-count">3</span></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2021/07/">July 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2021/06/">June 2021</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2018/05/">May 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2016/08/">August 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2016/07/">July 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2016/06/">June 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2016/04/">April 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2016/01/">January 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2015/11/">November 2015</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2015/01/">January 2015</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2014/11/">November 2014</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/public/archives/2014/02/">February 2014</a><span class="archive-list-count">1</span></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/public/2021/07/23/how-to-add-custom-field-in-webrtc-sdp/">How to add custom field in WebRTC SDP</a>
+          </li>
+        
+          <li>
+            <a href="/public/2021/07/22/how-to-support-simulcast-in-srs/">How to support Simulcast in SRS</a>
+          </li>
+        
+          <li>
+            <a href="/public/2021/06/28/a-mac-bug-about-udp-port-triggered-by-srs/">a mac bug about udp port triggered by srs</a>
+          </li>
+        
+          <li>
+            <a href="/public/2021/06/23/simulcast-layer-state-control/">simulcast layer state control</a>
+          </li>
+        
+          <li>
+            <a href="/public/2021/06/18/simulcast-support-in-srs/">simulcast support in srs</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2021 johzzy<br>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/public/" class="mobile-nav-link">Home</a>
+  
+    <a href="/public/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+  
+<link rel="stylesheet" href="/public/fancybox/jquery.fancybox.css">
+
+  
+<script src="/public/fancybox/jquery.fancybox.pack.js"></script>
+
+
+
+
+<script src="/public/js/script.js"></script>
+
+
+
+
+  </div>
+</body>
+</html>
